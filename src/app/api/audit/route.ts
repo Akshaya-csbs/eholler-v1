@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseMapUrl, fetchGooglePlaceData, fetchLocalCompetitors } from '@/lib/google-places';
 import { scrapeWebsite } from '@/lib/website-scraper';
 import { runLocalSeoAudit } from '@/lib/audit-engine';
-import { generateAiRecommendations } from '@/lib/ai-recommendations';
+import { generateAiRecommendationsV2 } from '@/lib/ai-recommendation-service';
 import { AuditResponse } from '@/lib/types';
+import { emptySearchConsoleMetrics } from '@/lib/gsc-metrics';
 
 export async function POST(req: NextRequest) {
   try {
@@ -85,7 +86,15 @@ export async function POST(req: NextRequest) {
     const auditEngineResult = runLocalSeoAudit(placeData, siteAudit, competitors);
 
     // 7. Generate AI Insights & Description Draft
-    const aiResult = await generateAiRecommendations(placeData, siteAudit, competitors);
+    const aiResult = await generateAiRecommendationsV2(
+      placeData,
+      siteAudit,
+      competitors,
+      undefined, // searchConsole — not connected at this point
+      auditEngineResult.priorityActions,
+      auditEngineResult.missingFields,
+      auditEngineResult.inconsistentFields,
+    );
 
     // 8. Dynamic Scores Calculation based on real profile signals
     const rating = placeData.rating || 0;
@@ -106,9 +115,11 @@ export async function POST(req: NextRequest) {
       calculatedMapsRank = Math.min(10, 1 + betterCompetitors.length);
     }
 
-    // Dynamic Traffic & Keyword estimates if Search Console is not yet authenticated via OAuth
-    const baseTraffic = Math.max(150, Math.round(reviewCount * 35 + rating * 120));
     const cat = placeData.primaryType || 'Service';
+    const mapsVisibilityPercent = Math.min(
+      98,
+      Math.max(25, Math.round((11 - calculatedMapsRank) * 10 - 5))
+    );
 
     // 9. Compile Complete Dynamic Audit Response
     const response: AuditResponse = {
@@ -140,28 +151,7 @@ export async function POST(req: NextRequest) {
         reviewGrowth: Math.min(100, Math.round((reviewCount / 100) * 100)) || 10,
         keywordRankings: Math.min(98, 70 + calculatedMapsRank * 3),
       },
-      searchConsole: {
-        connected: false,
-        organicTraffic: baseTraffic,
-        organicKeywordsCount: Math.max(3, Math.min(25, Math.round(reviewCount / 8) + 2)),
-        mapsVisibilityPercent: Math.min(98, Math.max(25, Math.round((11 - calculatedMapsRank) * 10 - 5))),
-        top10KeywordsCount: Math.max(2, Math.min(15, Math.round(reviewCount / 12) + 1)),
-        trafficTrend: [
-          Math.round(baseTraffic * 1.15),
-          Math.round(baseTraffic * 1.05),
-          Math.round(baseTraffic * 0.9),
-          Math.round(baseTraffic * 0.8),
-          Math.round(baseTraffic * 0.95),
-          Math.round(baseTraffic * 0.85),
-          baseTraffic,
-        ],
-        keywords: [
-          { query: `${cat.toLowerCase()} in ${resolvedCity.toLowerCase()}`, clicks: Math.round(baseTraffic * 0.4), impressions: baseTraffic * 3, position: calculatedMapsRank },
-          { query: `best ${cat.toLowerCase()} near me`, clicks: Math.round(baseTraffic * 0.25), impressions: baseTraffic * 2, position: calculatedMapsRank + 1 },
-          { query: `${placeData.displayName.toLowerCase()}`, clicks: Math.round(baseTraffic * 0.2), impressions: baseTraffic * 1.5, position: 1 },
-          { query: `${cat.toLowerCase()} services`, clicks: Math.round(baseTraffic * 0.15), impressions: baseTraffic * 1.2, position: calculatedMapsRank + 2 },
-        ],
-      },
+      searchConsole: emptySearchConsoleMetrics(mapsVisibilityPercent),
       priorityActions: auditEngineResult.priorityActions,
       aiRecommendations: aiResult.recommendations,
       optimizedDescriptionDraft: aiResult.descriptionDraft,
@@ -169,6 +159,7 @@ export async function POST(req: NextRequest) {
       missingFields: auditEngineResult.missingFields,
       inconsistentFields: auditEngineResult.inconsistentFields,
       whatNeedsToBeAdded: auditEngineResult.whatNeedsToBeAdded,
+      structuredRecommendations: aiResult.structuredRecommendations,
     };
 
     return NextResponse.json(response);

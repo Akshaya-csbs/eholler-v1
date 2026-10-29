@@ -21,6 +21,7 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   onOpenAuditModal: () => void;
   onOpenGscModal: () => void;
+  gscConnected?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -28,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   onOpenAuditModal,
   onOpenGscModal,
+  gscConnected = false,
 }) => {
   const mainNav = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, locked: false },
@@ -98,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-950/40 text-blue-400 border border-blue-800/40 hover:bg-blue-900/40 mb-3 transition"
         >
           <BarChart3 className="w-4 h-4 text-blue-400 shrink-0" />
-          <span>Connect Search Console</span>
+          <span>{gscConnected ? 'Search Console Connected' : 'Connect Google Search Console'}</span>
         </button>
 
         <button className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-[#1A2632] transition">

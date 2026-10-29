@@ -56,19 +56,45 @@ export interface AuditFinding {
   explanation: string;
 }
 
+export interface GscProperty {
+  siteUrl: string;
+  permissionLevel: string;
+}
+
+export interface GscQueryRow {
+  query: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+export interface GscAnalyticsResult {
+  siteUrl: string;
+  startDate: string;
+  endDate: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  averagePosition: number;
+  rowCount: number;
+  queries: GscQueryRow[];
+}
+
 export interface SearchConsoleMetrics {
   connected: boolean;
+  selectedProperty: string | null;
+  clicks: number | null;
+  impressions: number | null;
+  ctr: number | null;
+  averagePosition: number | null;
+  dateRange: { startDate: string; endDate: string } | null;
   organicTraffic: number;
   organicKeywordsCount: number;
   mapsVisibilityPercent: number;
   top10KeywordsCount: number;
   trafficTrend: number[];
-  keywords: Array<{
-    query: string;
-    clicks: number;
-    impressions: number;
-    position: number;
-  }>;
+  keywords: GscQueryRow[];
 }
 
 export interface AuditResponse {
@@ -104,4 +130,49 @@ export interface AuditResponse {
   missingFields: string[];
   inconsistentFields: string[];
   whatNeedsToBeAdded: string[];
+  structuredRecommendations?: StructuredRecommendation[];
+}
+
+export interface StructuredRecommendation {
+  issueTitle: string;
+  category:
+    | 'missing_seo_field'
+    | 'inconsistent_info'
+    | 'incomplete_description'
+    | 'missing_meta'
+    | 'content_optimization'
+    | 'search_console'
+    | 'local_seo_priority';
+  evidence: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  explanation: string;
+  recommendedAction: string;
+  suggestedContent?: string;
+  estimatedEffort: 'quick_win' | 'moderate' | 'significant';
+}
+
+export interface AIRecommendationRequest {
+  auditFindings: AuditFinding[];
+  business: {
+    name: string;
+    city: string;
+    address: string;
+    category: string;
+    phone: string;
+    websiteUrl: string;
+    rating: number;
+    reviewCount: number;
+  };
+  websiteAudit?: WebsiteAuditData;
+  competitors?: CompetitorItem[];
+  searchConsole?: SearchConsoleMetrics;
+  missingFields?: string[];
+  inconsistentFields?: string[];
+}
+
+export interface AIRecommendationResponse {
+  recommendations: StructuredRecommendation[];
+  descriptionDraft: string;
+  generatedAt: string;
+  modelUsed: string;
 }

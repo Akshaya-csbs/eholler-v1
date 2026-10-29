@@ -14,9 +14,10 @@ import { AuditResponse } from '@/lib/types';
 
 interface MetricCardsProps {
   data: AuditResponse;
+  onOpenGscModal?: () => void;
 }
 
-export const MetricCards: React.FC<MetricCardsProps> = ({ data }) => {
+export const MetricCards: React.FC<MetricCardsProps> = ({ data, onOpenGscModal }) => {
   const [showKeywordsMenu, setShowKeywordsMenu] = useState(false);
   const { scores, searchConsole } = data;
 
@@ -65,7 +66,12 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ data }) => {
       </div>
 
       {/* 2. Organic Traffic */}
-      <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm flex flex-col justify-between">
+      <div
+        onClick={!searchConsole.connected && onOpenGscModal ? onOpenGscModal : undefined}
+        className={`bg-white rounded-xl p-5 border border-gray-100 shadow-sm flex flex-col justify-between transition ${
+          !searchConsole.connected ? 'cursor-pointer hover:border-blue-200 hover:shadow-md' : ''
+        }`}
+      >
         <div className="flex items-center gap-2 text-xs font-semibold tracking-wider text-gray-500 uppercase">
           <div className="w-5 h-5 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center">
             <TrendingUp className="w-3.5 h-3.5" />
@@ -76,20 +82,36 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ data }) => {
 
         <div className="my-3 flex items-baseline justify-between">
           <span className="text-2xl font-bold text-gray-900">
-            {searchConsole.organicTraffic.toLocaleString()}
+            {searchConsole.connected && searchConsole.clicks !== null
+              ? searchConsole.clicks.toLocaleString()
+              : '—'}
           </span>
 
-          {/* Sparkline wave */}
-          <div className="w-24 h-8">
-            <svg viewBox="0 0 100 30" className="w-full h-full text-indigo-500 fill-none stroke-current stroke-2">
-              <path d="M0 5 Q 20 25, 40 18 T 70 28 T 100 12" />
-            </svg>
-          </div>
+          {searchConsole.connected ? (
+            <div className="w-24 h-8">
+              <svg viewBox="0 0 100 30" className="w-full h-full text-indigo-500 fill-none stroke-current stroke-2">
+                <path d="M0 5 Q 20 25, 40 18 T 70 28 T 100 12" />
+              </svg>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenGscModal?.();
+              }}
+              className="text-[10px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition"
+            >
+              Connect GSC
+            </button>
+          )}
         </div>
 
         <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-50 text-gray-500">
           <span>Search Console</span>
-          <span className="text-gray-400 text-[11px]">Last 30 days</span>
+          <span className="text-gray-400 text-[11px]">
+            {searchConsole.connected ? 'Last 28 days (live)' : 'Click to connect'}
+          </span>
         </div>
       </div>
 
@@ -104,7 +126,9 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ data }) => {
         </div>
 
         <div className="my-2 flex items-center justify-between">
-          <span className="text-2xl font-bold text-gray-900">{searchConsole.organicKeywordsCount}</span>
+          <span className="text-2xl font-bold text-gray-900">
+            {searchConsole.connected ? searchConsole.organicKeywordsCount : '—'}
+          </span>
           <div className="w-20 h-6">
             <svg viewBox="0 0 80 20" className="w-full h-full text-blue-500 fill-none stroke-current stroke-2">
               <path d="M0 12 L 20 12 L 30 4 L 45 15 L 60 8 L 80 8" />
@@ -126,12 +150,18 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ data }) => {
             <div className="absolute left-0 bottom-12 w-64 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-30 text-xs">
               <div className="font-semibold text-gray-900 mb-2 pb-1 border-b">Tracked Queries</div>
               <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                {searchConsole.keywords.map((kw, i) => (
-                  <div key={i} className="flex justify-between items-center text-gray-600 py-0.5">
-                    <span className="truncate pr-2">{kw.query}</span>
-                    <span className="font-mono text-gray-900 shrink-0 font-semibold">#{kw.position}</span>
-                  </div>
-                ))}
+                {!searchConsole.connected ? (
+                  <div className="text-gray-500">Connect Search Console to load live queries.</div>
+                ) : searchConsole.keywords.length === 0 ? (
+                  <div className="text-gray-500">No query rows returned for this date range.</div>
+                ) : (
+                  searchConsole.keywords.map((kw, i) => (
+                    <div key={i} className="flex justify-between items-center text-gray-600 py-0.5">
+                      <span className="truncate pr-2">{kw.query}</span>
+                      <span className="font-mono text-gray-900 shrink-0 font-semibold">#{kw.position}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}

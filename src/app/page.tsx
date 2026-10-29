@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
@@ -11,7 +11,9 @@ import { InsightsActions } from '@/components/InsightsActions';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { AuditDetailModal } from '@/components/AuditDetailModal';
 import { ConnectGscModal } from '@/components/ConnectGscModal';
-import { AuditResponse, BusinessInput } from '@/lib/types';
+import { SearchConsolePanel } from '@/components/SearchConsolePanel';
+import { AuditResponse, BusinessInput, GscAnalyticsResult } from '@/lib/types';
+import { emptySearchConsoleMetrics, metricsFromAnalytics } from '@/lib/gsc-metrics';
 import {
   AlertCircle,
   Search,
@@ -35,6 +37,10 @@ export default function DashboardPage() {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [isGscModalOpen, setIsGscModalOpen] = useState<boolean>(false);
+  const [gscConnected, setGscConnected] = useState<boolean>(false);
+  const [gscProperty, setGscProperty] = useState<string | null>(null);
+  const [gscLoading, setGscLoading] = useState<boolean>(false);
+  const [gscAnalytics, setGscAnalytics] = useState<GscAnalyticsResult | null>(null);
 
   // Top Bar Search
   const [quickMapUrl, setQuickMapUrl] = useState<string>('');
@@ -45,12 +51,86 @@ export default function DashboardPage() {
   const [formCity, setFormCity] = useState<string>('');
   const [formWebsite, setFormWebsite] = useState<string>('');
 
+  const applyGscAnalytics = (analytics: GscAnalyticsResult | null, connected: boolean, property: string | null) => {
+    setGscConnected(connected);
+    setGscProperty(property);
+    setGscAnalytics(analytics);
+    setData((current) => {
+      if (!current) return current;
+      const mapsVisibility = current.searchConsole.mapsVisibilityPercent;
+      return {
+        ...current,
+        searchConsole: analytics
+          ? metricsFromAnalytics(analytics, mapsVisibility)
+          : {
+              ...emptySearchConsoleMetrics(mapsVisibility),
+              connected,
+              selectedProperty: property,
+            },
+      };
+    });
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('gsc') === 'connected' || params.get('gsc_error')) {
+      setIsGscModalOpen(true);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    let cancelled = false;
+    const hydrateGsc = async () => {
+      setGscLoading(true);
+      try {
+        const statusRes = await axios.get('/api/connections/google/status');
+        if (cancelled) return;
+        setGscConnected(Boolean(statusRes.data.connected));
+        setGscProperty(statusRes.data.selectedProperty || null);
+
+        if (statusRes.data.connected && statusRes.data.selectedProperty) {
+          const analyticsRes = await axios.get<GscAnalyticsResult>('/api/connections/google/analytics');
+          if (cancelled) return;
+          applyGscAnalytics(analyticsRes.data, true, statusRes.data.selectedProperty);
+        }
+      } catch {
+        if (!cancelled) {
+          setGscConnected(false);
+        }
+      } finally {
+        if (!cancelled) setGscLoading(false);
+      }
+    };
+
+    hydrateGsc();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const runAudit = async (input: BusinessInput) => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await axios.post('/api/audit', input);
-      setData(response.data);
+      const audit: AuditResponse = response.data;
+      if (gscConnected && gscProperty) {
+        try {
+          const analyticsRes = await axios.get<GscAnalyticsResult>('/api/connections/google/analytics', {
+            params: { siteUrl: gscProperty },
+          });
+          audit.searchConsole = metricsFromAnalytics(
+            analyticsRes.data,
+            audit.searchConsole.mapsVisibilityPercent
+          );
+        } catch {
+          audit.searchConsole = {
+            ...audit.searchConsole,
+            connected: true,
+            selectedProperty: gscProperty,
+          };
+        }
+      }
+      setData(audit);
       setIsOnboardingOpen(false);
     } catch (err: any) {
       console.error('Audit failed:', err);
@@ -87,6 +167,7 @@ export default function DashboardPage() {
         setActiveTab={setActiveTab}
         onOpenAuditModal={() => setIsOnboardingOpen(true)}
         onOpenGscModal={() => setIsGscModalOpen(true)}
+        gscConnected={gscConnected}
       />
 
       {/* 2. Main Workspace */}
@@ -106,6 +187,8 @@ export default function DashboardPage() {
             isLoading={isLoading}
             onOpenAuditModal={() => setIsOnboardingOpen(true)}
             onOpenDrawer={() => setIsDrawerOpen(true)}
+            gscConnected={gscConnected}
+            onOpenGscModal={() => setIsGscModalOpen(true)}
           />
         ) : (
           <div className="bg-white border-b border-gray-200 px-8 py-5 flex items-center justify-between">
@@ -113,9 +196,22 @@ export default function DashboardPage() {
               <div className="text-xs text-gray-500 font-medium">Local SEO Platform</div>
               <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Business Profile Auditor</h1>
             </div>
-            <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Google Places API Connected</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Google Places API Connected</span>
+              </div>
+              <button
+                onClick={() => setIsGscModalOpen(true)}
+                className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border font-semibold ${
+                  gscConnected
+                    ? 'text-blue-700 bg-blue-50 border-blue-200'
+                    : 'text-gray-600 bg-white border-gray-200 hover:border-blue-300'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${gscConnected ? 'bg-blue-500' : 'bg-gray-400'}`} />
+                <span>{gscConnected ? 'Search Console Connected' : 'Connect Google Search Console'}</span>
+              </button>
             </div>
           </div>
         )}
@@ -176,10 +272,38 @@ export default function DashboardPage() {
               <p className="text-xs text-gray-500 max-w-md mx-auto">
                 Resolving Google Places data, checking NAP consistency, analyzing SSL security, discovering competitors, and generating AI recommendations.
               </p>
+              <div className="flex items-center justify-center gap-3 mt-4 text-[11px] text-gray-400">
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Google Places API
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+                  Website Crawler
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+                  OpenAI Recommendations
+                </span>
+              </div>
             </div>
           ) : !data ? (
             /* Initial Welcome Box: Enter ANY Business */
-            <div className="max-w-2xl mx-auto my-6 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            <div className="max-w-2xl mx-auto my-6 space-y-4">
+            <SearchConsolePanel
+              metrics={
+                gscAnalytics
+                  ? metricsFromAnalytics(gscAnalytics, 0)
+                  : {
+                      ...emptySearchConsoleMetrics(),
+                      connected: gscConnected,
+                      selectedProperty: gscProperty,
+                    }
+              }
+              onOpenConnect={() => setIsGscModalOpen(true)}
+              loading={gscLoading}
+            />
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
               <div className="bg-[#121A21] text-white p-6">
                 <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-orange-500/20 text-orange-400 text-xs font-semibold mb-2">
                   <Sparkles className="w-3.5 h-3.5" />
@@ -266,6 +390,7 @@ export default function DashboardPage() {
                 </div>
               </form>
             </div>
+            </div>
           ) : (
             /* Dashboard Loaded for the specific Analyzed Business */
             <>
@@ -281,7 +406,13 @@ export default function DashboardPage() {
               <h2 className="text-xl font-bold text-gray-900 -mt-2">{data.business.name}</h2>
 
               {/* 1. Metric Cards (Authority Score, Organic Traffic, Keywords, Visibility, GBP Health) */}
-              <MetricCards data={data} />
+              <MetricCards data={data} onOpenGscModal={() => setIsGscModalOpen(true)} />
+
+              <SearchConsolePanel
+                metrics={data.searchConsole}
+                onOpenConnect={() => setIsGscModalOpen(true)}
+                loading={gscLoading}
+              />
 
               {/* 2. Optimization Progress Bars */}
               <OptimizationProgress scores={data.scores} />
@@ -313,18 +444,11 @@ export default function DashboardPage() {
       <ConnectGscModal
         isOpen={isGscModalOpen}
         onClose={() => setIsGscModalOpen(false)}
-        onConnect={() => {
-          if (data) {
-            setData({
-              ...data,
-              searchConsole: {
-                ...data.searchConsole,
-                connected: true,
-              },
-            });
-          }
+        isConnected={gscConnected}
+        selectedProperty={gscProperty}
+        onConnectedChange={({ connected, selectedProperty, analytics }) => {
+          applyGscAnalytics(analytics, connected, selectedProperty);
         }}
-        isConnected={data?.searchConsole.connected || false}
       />
     </div>
   );

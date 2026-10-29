@@ -8,6 +8,8 @@ interface HeaderProps {
   isLoading: boolean;
   onOpenAuditModal: () => void;
   onOpenDrawer: () => void;
+  gscConnected?: boolean;
+  onOpenGscModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -16,6 +18,8 @@ export const Header: React.FC<HeaderProps> = ({
   isLoading,
   onOpenAuditModal,
   onOpenDrawer,
+  gscConnected = false,
+  onOpenGscModal,
 }) => {
   if (!data) return null;
 
@@ -78,6 +82,20 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Action Buttons */}
       <div className="flex items-center gap-3 shrink-0">
+        {onOpenGscModal && (
+          <button
+            onClick={onOpenGscModal}
+            className={`px-3.5 py-2 rounded-lg text-sm font-medium border flex items-center gap-2 transition ${
+              gscConnected
+                ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50 hover:text-blue-700'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${gscConnected ? 'bg-blue-500' : 'bg-gray-400'}`} />
+            <span>{gscConnected ? 'Search Console Connected' : 'Connect Google Search Console'}</span>
+          </button>
+        )}
+
         <button
           onClick={onOpenDrawer}
           className="px-3.5 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 flex items-center gap-2 transition"
