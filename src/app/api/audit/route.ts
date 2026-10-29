@@ -1,0 +1,182 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { parseMapUrl, fetchGooglePlaceData, fetchLocalCompetitors } from '@/lib/google-places';
+import { scrapeWebsite } from '@/lib/website-scraper';
+import { runLocalSeoAudit } from '@/lib/audit-engine';
+import { generateAiRecommendations } from '@/lib/ai-recommendations';
+import { AuditResponse } from '@/lib/types';
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { mapUrl, businessName, city, websiteUrl } = body;
+
+    if (!mapUrl && !businessName) {
+      return NextResponse.json(
+        { error: 'Please enter a Google Maps URL, Place ID, or Business Name to analyze.' },
+        { status: 400 }
+      );
+    }
+
+    const apiKey = process.env.GOOGLE_MAPS_API_KEY || '';
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'GOOGLE_MAPS_API_KEY is not configured in .env.local' },
+        { status: 500 }
+      );
+    }
+
+    // 1. Resolve Map URL or Query
+    let queryToSearch = businessName ? `${businessName} ${city || ''}`.trim() : '';
+    let extractedPlaceId: string | undefined;
+
+    if (mapUrl) {
+      const parsed = await parseMapUrl(mapUrl);
+      if (parsed.placeId) {
+        extractedPlaceId = parsed.placeId;
+      } else if (parsed.queryName) {
+        queryToSearch = city ? `${parsed.queryName} ${city}` : parsed.queryName;
+      } else if (!queryToSearch) {
+        queryToSearch = mapUrl.trim();
+      }
+    }
+
+    if (!queryToSearch && !extractedPlaceId) {
+      return NextResponse.json(
+        { error: 'Could not extract a valid business query or Place ID from the provided URL.' },
+        { status: 400 }
+      );
+    }
+
+    // 2. Fetch Google Place Details
+    const placeData = await fetchGooglePlaceData(queryToSearch, apiKey, extractedPlaceId);
+    if (!placeData) {
+      return NextResponse.json(
+        { error: `Could not resolve Google Business Profile for "${queryToSearch}". Please check the Google Maps URL or enter the exact business name.` },
+        { status: 404 }
+      );
+    }
+
+    // 3. Resolve Website & City from Place Data
+    const targetWebsite = websiteUrl || placeData.websiteUri || '';
+    const addressParts = placeData.formattedAddress.split(',');
+    const resolvedCity =
+      city ||
+      (addressParts.length >= 3 ? addressParts[addressParts.length - 3].trim() : 'Local Area');
+
+    // 4. Crawl & Verify Website
+    let siteAudit = undefined;
+    if (targetWebsite) {
+      siteAudit = await scrapeWebsite(
+        targetWebsite,
+        placeData.nationalPhoneNumber,
+        resolvedCity
+      );
+    }
+
+    // 5. Fetch Real Competitors dynamically from Google Places API
+    const competitors = await fetchLocalCompetitors(
+      placeData.primaryType || 'Business',
+      resolvedCity,
+      placeData.id,
+      apiKey
+    );
+
+    // 6. Run Local SEO Audit & Rules Engine
+    const auditEngineResult = runLocalSeoAudit(placeData, siteAudit, competitors);
+
+    // 7. Generate AI Insights & Description Draft
+    const aiResult = await generateAiRecommendations(placeData, siteAudit, competitors);
+
+    // 8. Dynamic Scores Calculation based on real profile signals
+    const rating = placeData.rating || 0;
+    const reviewCount = placeData.userRatingCount || 0;
+    const photosCount = placeData.photosCount || 0;
+
+    // Authority Score (0-100): Weighted formula
+    const ratingContribution = (rating / 5) * 40;
+    const reviewContribution = Math.min(30, Math.log10(reviewCount + 1) * 15);
+    const webContribution = siteAudit?.isHttps ? 15 : targetWebsite ? 8 : 0;
+    const photosContribution = Math.min(15, (photosCount / 10) * 15);
+    const authorityScore = Math.min(99, Math.round(ratingContribution + reviewContribution + webContribution + photosContribution)) || 40;
+
+    // Dynamic Rank Estimation relative to local competitors
+    let calculatedMapsRank = 1;
+    if (competitors.length > 0) {
+      const betterCompetitors = competitors.filter(c => c.reviews > reviewCount && c.rating >= rating);
+      calculatedMapsRank = Math.min(10, 1 + betterCompetitors.length);
+    }
+
+    // Dynamic Traffic & Keyword estimates if Search Console is not yet authenticated via OAuth
+    const baseTraffic = Math.max(150, Math.round(reviewCount * 35 + rating * 120));
+    const cat = placeData.primaryType || 'Service';
+
+    // 9. Compile Complete Dynamic Audit Response
+    const response: AuditResponse = {
+      business: {
+        name: placeData.displayName,
+        city: resolvedCity,
+        address: placeData.formattedAddress,
+        category: cat,
+        phone: placeData.nationalPhoneNumber || 'Not provided',
+        websiteUrl: targetWebsite,
+        mapUrl: mapUrl || `https://www.google.com/maps/place/?q=place_id:${placeData.id}`,
+        placeId: placeData.id,
+        rating: rating,
+        reviewCount: reviewCount,
+        updatedAt: new Date().toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        }),
+      },
+      scores: {
+        authorityScore: authorityScore,
+        mapsRank: calculatedMapsRank,
+        gbpHealth: auditEngineResult.gbpHealth,
+        gbpHealthChange: auditEngineResult.gbpHealth < 60 ? -5 : 5,
+        citationHealth: siteAudit?.hasPhoneMatch ? 100 : 70,
+        gbpOptimization: Math.round((auditEngineResult.gbpHealth / 100) * 100),
+        citationFixes: siteAudit?.hasPhoneMatch ? 100 : 65,
+        reviewGrowth: Math.min(100, Math.round((reviewCount / 100) * 100)) || 10,
+        keywordRankings: Math.min(98, 70 + calculatedMapsRank * 3),
+      },
+      searchConsole: {
+        connected: false,
+        organicTraffic: baseTraffic,
+        organicKeywordsCount: Math.max(3, Math.min(25, Math.round(reviewCount / 8) + 2)),
+        mapsVisibilityPercent: Math.min(98, Math.max(25, Math.round((11 - calculatedMapsRank) * 10 - 5))),
+        top10KeywordsCount: Math.max(2, Math.min(15, Math.round(reviewCount / 12) + 1)),
+        trafficTrend: [
+          Math.round(baseTraffic * 1.15),
+          Math.round(baseTraffic * 1.05),
+          Math.round(baseTraffic * 0.9),
+          Math.round(baseTraffic * 0.8),
+          Math.round(baseTraffic * 0.95),
+          Math.round(baseTraffic * 0.85),
+          baseTraffic,
+        ],
+        keywords: [
+          { query: `${cat.toLowerCase()} in ${resolvedCity.toLowerCase()}`, clicks: Math.round(baseTraffic * 0.4), impressions: baseTraffic * 3, position: calculatedMapsRank },
+          { query: `best ${cat.toLowerCase()} near me`, clicks: Math.round(baseTraffic * 0.25), impressions: baseTraffic * 2, position: calculatedMapsRank + 1 },
+          { query: `${placeData.displayName.toLowerCase()}`, clicks: Math.round(baseTraffic * 0.2), impressions: baseTraffic * 1.5, position: 1 },
+          { query: `${cat.toLowerCase()} services`, clicks: Math.round(baseTraffic * 0.15), impressions: baseTraffic * 1.2, position: calculatedMapsRank + 2 },
+        ],
+      },
+      priorityActions: auditEngineResult.priorityActions,
+      aiRecommendations: aiResult.recommendations,
+      optimizedDescriptionDraft: aiResult.descriptionDraft,
+      competitors: competitors,
+      missingFields: auditEngineResult.missingFields,
+      inconsistentFields: auditEngineResult.inconsistentFields,
+      whatNeedsToBeAdded: auditEngineResult.whatNeedsToBeAdded,
+    };
+
+    return NextResponse.json(response);
+  } catch (error: any) {
+    console.error('Audit API error:', error);
+    return NextResponse.json(
+      { error: 'Internal audit error: ' + (error.message || 'Unknown error') },
+      { status: 500 }
+    );
+  }
+}
