@@ -87,22 +87,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Bottom Nav */}
       <div className="p-4 border-t border-[#1E2B37] space-y-1">
-        <button
-          onClick={onOpenAuditModal}
-          className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-xs font-semibold bg-emerald-950/40 text-emerald-400 border border-emerald-800/40 hover:bg-emerald-900/40 mb-2 transition"
-        >
-          <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>+ Analyze New Business</span>
-        </button>
-
-        <button
-          onClick={onOpenGscModal}
-          className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-950/40 text-blue-400 border border-blue-800/40 hover:bg-blue-900/40 mb-3 transition"
-        >
-          <BarChart3 className="w-4 h-4 text-blue-400 shrink-0" />
-          <span>{gscConnected ? 'Search Console Connected' : 'Connect Google Search Console'}</span>
-        </button>
-
         <button className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-[#1A2632] transition">
           <Settings className="w-4 h-4" />
           <span>Business Settings</span>

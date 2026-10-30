@@ -80,41 +80,12 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Action Buttons */}
+      {/* Action Button: Run analysis */}
       <div className="flex items-center gap-3 shrink-0">
-        {onOpenGscModal && (
-          <button
-            onClick={onOpenGscModal}
-            className={`px-3.5 py-2 rounded-lg text-sm font-medium border flex items-center gap-2 transition ${
-              gscConnected
-                ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50 hover:text-blue-700'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${gscConnected ? 'bg-blue-500' : 'bg-gray-400'}`} />
-            <span>{gscConnected ? 'Search Console Connected' : 'Connect Google Search Console'}</span>
-          </button>
-        )}
-
-        <button
-          onClick={onOpenDrawer}
-          className="px-3.5 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 flex items-center gap-2 transition"
-        >
-          <Layers className="w-4 h-4 text-gray-600" />
-          <span>Audit Breakdown</span>
-        </button>
-
         <button
           onClick={onOpenAuditModal}
-          className="px-3.5 py-2 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 transition"
-        >
-          Switch Business URL
-        </button>
-
-        <button
-          onClick={onRefresh}
           disabled={isLoading}
-          className="px-5 py-2 rounded-lg text-sm font-semibold text-white bg-[#C84A22] hover:bg-[#B33E1A] shadow-sm flex items-center gap-2 transition disabled:opacity-50"
+          className="px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-[#C84A22] hover:bg-[#B33E1A] shadow-sm flex items-center gap-2 transition disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           <span>{isLoading ? 'Analyzing...' : 'Run analysis'}</span>
