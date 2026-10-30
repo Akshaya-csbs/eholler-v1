@@ -12,6 +12,7 @@ import { OnboardingModal } from '@/components/OnboardingModal';
 import { AuditDetailModal } from '@/components/AuditDetailModal';
 import { ConnectGscModal } from '@/components/ConnectGscModal';
 import { SearchConsolePanel } from '@/components/SearchConsolePanel';
+import { GbpAuditView } from '@/components/GbpAuditView';
 import { AuditResponse, BusinessInput, GscAnalyticsResult } from '@/lib/types';
 import { emptySearchConsoleMetrics, metricsFromAnalytics } from '@/lib/gsc-metrics';
 import {
@@ -25,6 +26,8 @@ import {
   ArrowRight,
   ShieldCheck,
   CheckCircle2,
+  LayoutDashboard,
+  FileCheck2,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -392,37 +395,122 @@ export default function DashboardPage() {
             </div>
             </div>
           ) : (
-            /* Dashboard Loaded for the specific Analyzed Business */
-            <>
-              {/* Local SEO Badge Banner matching screenshot 1 */}
-              <div className="flex items-center justify-between pt-1">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-orange-100/70 text-orange-800 text-[11px] font-bold tracking-wider uppercase">
-                  <span>LOCAL SEO</span>
+            /* Analyzed Business Loaded View */
+            <div className="space-y-6">
+              {/* Top View Switcher: Overview Dashboard vs Complete GBP Audit */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                      activeTab === 'dashboard'
+                        ? 'bg-[#121A21] text-white shadow'
+                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                    }`}
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5" />
+                    <span>Overview Dashboard</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('profile-opt')}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                      activeTab === 'profile-opt'
+                        ? 'bg-[#C84A22] text-white shadow'
+                        : 'bg-white text-gray-700 border border-orange-200 hover:bg-orange-50/50'
+                    }`}
+                  >
+                    <FileCheck2 className="w-3.5 h-3.5 text-orange-500" />
+                    <span>Complete GBP Audit (57 Fields)</span>
+                    {data.gbpCompleteAudit && (
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          activeTab === 'profile-opt'
+                            ? 'bg-white/20 text-white'
+                            : 'bg-orange-100 text-orange-800'
+                        }`}
+                      >
+                        {data.gbpCompleteAudit.completenessScore}% Complete
+                      </span>
+                    )}
+                  </button>
                 </div>
+
                 <div className="text-xs text-gray-500">Updated {data.business.updatedAt}</div>
               </div>
 
-              {/* Business Name Subtitle */}
-              <h2 className="text-xl font-bold text-gray-900 -mt-2">{data.business.name}</h2>
+              {activeTab === 'profile-opt' ? (
+                /* Complete AI-Powered Google Business Profile Audit */
+                <GbpAuditView
+                  auditResult={data.gbpCompleteAudit}
+                  onBackToDashboard={() => setActiveTab('dashboard')}
+                />
+              ) : (
+                /* Overview Dashboard */
+                <>
+                  {/* Local SEO Badge Banner */}
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-orange-100/70 text-orange-800 text-[11px] font-bold tracking-wider uppercase">
+                      <span>LOCAL SEO</span>
+                    </div>
+                  </div>
 
-              {/* 1. Metric Cards (Authority Score, Organic Traffic, Keywords, Visibility, GBP Health) */}
-              <MetricCards data={data} onOpenGscModal={() => setIsGscModalOpen(true)} />
+                  {/* Business Name Subtitle */}
+                  <h2 className="text-xl font-bold text-gray-900 -mt-2">{data.business.name}</h2>
 
-              <SearchConsolePanel
-                metrics={data.searchConsole}
-                onOpenConnect={() => setIsGscModalOpen(true)}
-                loading={gscLoading}
-              />
+                  {/* Highlight Banner to Open Complete GBP Audit */}
+                  {data.gbpCompleteAudit && (
+                    <div className="bg-gradient-to-r from-orange-50 via-white to-orange-50/40 p-4 rounded-2xl border border-orange-200 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#C84A22] text-white flex items-center justify-center font-bold shrink-0 shadow">
+                          <Sparkles className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                            <span>AI-Powered Google Business Profile Audit</span>
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                              {data.gbpCompleteAudit.completenessScore}% Completeness
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-600 mt-0.5">
+                            57 profile fields evaluated across 9 categories · {data.gbpCompleteAudit.missingCount} missing · {data.gbpCompleteAudit.needsImprovementCount} need improvement · AI ready-to-copy content generated.
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setActiveTab('profile-opt')}
+                        className="px-4 py-2 bg-[#C84A22] hover:bg-[#B33E1A] text-white text-xs font-bold rounded-xl shrink-0 transition flex items-center gap-1.5 shadow"
+                      >
+                        <span>Open Complete Audit &amp; Content</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
 
-              {/* 2. Optimization Progress Bars */}
-              <OptimizationProgress scores={data.scores} />
+                  {/* 1. Metric Cards (Authority Score, Organic Traffic, Keywords, Visibility, GBP Health) */}
+                  <MetricCards data={data} onOpenGscModal={() => setIsGscModalOpen(true)} />
 
-              {/* 3. Your Tools Section */}
-              <ToolsSection data={data} onOpenAuditDrawer={() => setIsDrawerOpen(true)} />
+                  <SearchConsolePanel
+                    metrics={data.searchConsole}
+                    onOpenConnect={() => setIsGscModalOpen(true)}
+                    loading={gscLoading}
+                  />
 
-              {/* 4. Insights & Actions (Priority Actions, AI Recommendations, Top Competitors) */}
-              <InsightsActions data={data} onOpenAuditDrawer={() => setIsDrawerOpen(true)} />
-            </>
+                  {/* 2. Optimization Progress Bars */}
+                  <OptimizationProgress scores={data.scores} />
+
+                  {/* 3. Your Tools Section */}
+                  <ToolsSection
+                    data={data}
+                    onOpenAuditDrawer={() => setIsDrawerOpen(true)}
+                    onOpenGbpAudit={() => setActiveTab('profile-opt')}
+                  />
+
+                  {/* 4. Insights & Actions (Priority Actions, AI Recommendations, Top Competitors) */}
+                  <InsightsActions data={data} onOpenAuditDrawer={() => setIsDrawerOpen(true)} />
+                </>
+              )}
+            </div>
           )}
         </main>
       </div>
@@ -439,6 +527,7 @@ export default function DashboardPage() {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         data={data}
+        onOpenGbpAudit={() => setActiveTab('profile-opt')}
       />
 
       <ConnectGscModal

@@ -6,9 +6,15 @@ interface AuditDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   data: AuditResponse | null;
+  onOpenGbpAudit?: () => void;
 }
 
-export const AuditDetailModal: React.FC<AuditDetailModalProps> = ({ isOpen, onClose, data }) => {
+export const AuditDetailModal: React.FC<AuditDetailModalProps> = ({
+  isOpen,
+  onClose,
+  data,
+  onOpenGbpAudit,
+}) => {
   if (!isOpen || !data) return null;
 
   const { business, missingFields, inconsistentFields, whatNeedsToBeAdded, priorityActions, scores } = data;
@@ -173,12 +179,25 @@ export const AuditDetailModal: React.FC<AuditDetailModalProps> = ({ isOpen, onCl
         {/* Footer */}
         <div className="p-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between shrink-0">
           <span className="text-xs text-gray-500">Cross-verified via Google Places API &amp; Server Web Crawler</span>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-white bg-[#C84A22] hover:bg-[#B33E1A] rounded-lg transition"
-          >
-            Close Audit
-          </button>
+          <div className="flex items-center gap-2">
+            {onOpenGbpAudit && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenGbpAudit();
+                }}
+                className="px-3.5 py-2 text-xs font-semibold text-orange-800 bg-orange-100 hover:bg-orange-200 border border-orange-200 rounded-lg transition"
+              >
+                View 57-Field GBP Audit &rarr;
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-semibold text-white bg-[#C84A22] hover:bg-[#B33E1A] rounded-lg transition"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     </div>

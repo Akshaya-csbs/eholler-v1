@@ -51,7 +51,97 @@ export async function scrapeWebsite(
 
     const pageText = $('body').text().toLowerCase();
 
-    // Check Phone match (normalizing numbers to digits only)
+    // 1. Headings extraction
+    const headings: string[] = [];
+    $('h1, h2, h3').each((_, el) => {
+      const text = $(el).text().replace(/\s+/g, ' ').trim();
+      if (text.length >= 3 && text.length <= 120 && !headings.includes(text)) {
+        headings.push(text);
+      }
+    });
+    result.headings = headings.slice(0, 15);
+
+    // 2. Substantial Paragraphs & About Snippet
+    const paragraphs: string[] = [];
+    $('p, article, section').each((_, el) => {
+      const text = $(el).text().replace(/\s+/g, ' ').trim();
+      if (text.length >= 40 && text.length <= 400 && !paragraphs.includes(text)) {
+        paragraphs.push(text);
+      }
+    });
+    result.paragraphs = paragraphs.slice(0, 8);
+    result.aboutSnippet = paragraphs.find(p =>
+      p.toLowerCase().includes('about') ||
+      p.toLowerCase().includes('specializ') ||
+      p.toLowerCase().includes('consult') ||
+      p.toLowerCase().includes('service') ||
+      p.toLowerCase().includes('lead')
+    ) || paragraphs[0] || '';
+
+    // 3. Detect Services Mentioned
+    const servicesFound: string[] = [];
+    $('nav a, header a, footer a, li, .service, .services, #services').each((_, el) => {
+      const text = $(el).text().replace(/\s+/g, ' ').trim();
+      if (
+        text.length >= 4 &&
+        text.length <= 50 &&
+        !['home', 'about', 'contact', 'privacy', 'terms', 'blog', 'login', 'signup'].includes(text.toLowerCase()) &&
+        !servicesFound.includes(text)
+      ) {
+        // Look for service-like patterns
+        if (
+          text.toLowerCase().includes('consult') ||
+          text.toLowerCase().includes('certif') ||
+          text.toLowerCase().includes('iso') ||
+          text.toLowerCase().includes('management') ||
+          text.toLowerCase().includes('audit') ||
+          text.toLowerCase().includes('training') ||
+          text.toLowerCase().includes('service') ||
+          text.toLowerCase().includes('repair') ||
+          text.toLowerCase().includes('dental') ||
+          text.toLowerCase().includes('treatment') ||
+          text.toLowerCase().includes('care')
+        ) {
+          servicesFound.push(text);
+        }
+      }
+    });
+    result.servicesMentioned = Array.from<string>(new Set([...servicesFound, ...headings.filter(h => h.length < 40)])).slice(0, 12);
+
+    // 4. Booking / Appointment URLs
+    let foundAppointmentUrl: string | undefined = undefined;
+    $('a[href]').each((_, el) => {
+      const href = $(el).attr('href')?.trim() || '';
+      const text = $(el).text().toLowerCase();
+      if (
+        href.includes('calendly.com') ||
+        href.includes('booking') ||
+        href.includes('appointment') ||
+        href.includes('wa.me') ||
+        href.includes('api.whatsapp.com') ||
+        text.includes('book appointment') ||
+        text.includes('schedule consultation') ||
+        text.includes('book online') ||
+        text.includes('request quote')
+      ) {
+        if (!foundAppointmentUrl) {
+          if (href.startsWith('http://') || href.startsWith('https://')) {
+            foundAppointmentUrl = href;
+          } else if (href.startsWith('/')) {
+            foundAppointmentUrl = `${url.replace(/\/$/, '')}${href}`;
+          }
+        }
+      }
+    });
+    result.appointmentUrl = foundAppointmentUrl;
+
+    // 5. Contact Emails
+    const emailMatches = html.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
+    if (emailMatches) {
+      result.contactEmails = Array.from<string>(new Set(emailMatches.filter((e: string) => !e.endsWith('.png') && !e.endsWith('.jpg')))).slice(0, 3);
+    }
+
+    // 6. Check Phone match (normalizing numbers to digits only)
     if (businessPhone) {
       const cleanPhone = businessPhone.replace(/\D/g, '');
       const last7Digits = cleanPhone.slice(-7);
@@ -60,7 +150,7 @@ export async function scrapeWebsite(
       }
     }
 
-    // Check City/Address match
+    // 7. Check City/Address match
     if (city && city.trim().length > 2) {
       const cityLower = city.toLowerCase().trim();
       if (pageText.includes(cityLower)) {
@@ -68,7 +158,7 @@ export async function scrapeWebsite(
       }
     }
 
-    // Check Schema.org JSON-LD
+    // 8. Check Schema.org JSON-LD
     $('script[type="application/ld+json"]').each((_, el) => {
       try {
         const jsonText = $(el).html();
@@ -78,8 +168,9 @@ export async function scrapeWebsite(
           if (
             typeStr.includes('localbusiness') ||
             typeStr.includes('organization') ||
-            typeStr.includes('professionalService') ||
-            typeStr.includes('store')
+            typeStr.includes('professionalservice') ||
+            typeStr.includes('store') ||
+            typeStr.includes('medicalbusiness')
           ) {
             result.hasLocalBusinessSchema = true;
           }

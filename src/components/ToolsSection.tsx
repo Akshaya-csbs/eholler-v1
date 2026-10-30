@@ -13,9 +13,14 @@ import { AuditResponse } from '@/lib/types';
 interface ToolsSectionProps {
   data: AuditResponse;
   onOpenAuditDrawer: () => void;
+  onOpenGbpAudit?: () => void;
 }
 
-export const ToolsSection: React.FC<ToolsSectionProps> = ({ data, onOpenAuditDrawer }) => {
+export const ToolsSection: React.FC<ToolsSectionProps> = ({
+  data,
+  onOpenAuditDrawer,
+  onOpenGbpAudit,
+}) => {
   const { business, competitors } = data;
 
   return (
@@ -30,7 +35,7 @@ export const ToolsSection: React.FC<ToolsSectionProps> = ({ data, onOpenAuditDra
       <div className="space-y-3">
         {/* 1. Profile Optimization */}
         <div
-          onClick={onOpenAuditDrawer}
+          onClick={onOpenGbpAudit || onOpenAuditDrawer}
           className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm flex items-center justify-between hover:border-orange-200 hover:shadow transition cursor-pointer group"
         >
           <div className="flex items-start gap-4">

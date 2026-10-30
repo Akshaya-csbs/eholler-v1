@@ -60,12 +60,14 @@ export async function fetchGooglePlaceData(
         'id,displayName,formattedAddress,websiteUri,nationalPhoneNumber,rating,userRatingCount,primaryTypeDisplayName,editorialSummary,regularOpeningHours,photos',
     };
 
+    const fieldMask =
+      'id,displayName,formattedAddress,addressComponents,location,websiteUri,nationalPhoneNumber,internationalPhoneNumber,rating,userRatingCount,primaryType,primaryTypeDisplayName,types,editorialSummary,regularOpeningHours,businessStatus,accessibilityOptions,paymentOptions,parkingOptions,photos';
+
     if (specificPlaceId) {
       const headers = {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': apiKey,
-        'X-Goog-FieldMask':
-          'id,displayName,formattedAddress,websiteUri,nationalPhoneNumber,rating,userRatingCount,primaryTypeDisplayName,editorialSummary,regularOpeningHours,photos',
+        'X-Goog-FieldMask': fieldMask,
       };
       const url = `https://places.googleapis.com/v1/places/${specificPlaceId}`;
       const res = await axios.get(url, { headers, timeout: 8000 });
@@ -73,11 +75,15 @@ export async function fetchGooglePlaceData(
     }
 
     const searchUrl = 'https://places.googleapis.com/v1/places:searchText';
+    const searchFieldMask = fieldMask
+      .split(',')
+      .map((f) => `places.${f}`)
+      .join(',');
+
     const searchHeaders = {
       'Content-Type': 'application/json',
       'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask':
-        'places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.rating,places.userRatingCount,places.primaryTypeDisplayName,places.editorialSummary,places.regularOpeningHours,places.photos',
+      'X-Goog-FieldMask': searchFieldMask,
     };
     const body = { textQuery: searchQuery };
     const res = await axios.post(searchUrl, body, { headers: searchHeaders, timeout: 8000 });
@@ -102,12 +108,26 @@ function formatPlace(place: any): GooglePlaceData {
     rating: place.rating || 0,
     userRatingCount: place.userRatingCount || 0,
     websiteUri: place.websiteUri || '',
-    primaryType: place.primaryTypeDisplayName?.text || 'Business',
+    primaryType: place.primaryTypeDisplayName?.text || place.primaryType || 'Business',
+    primaryTypeDisplayName: place.primaryTypeDisplayName?.text,
+    types: place.types || [],
+    location: place.location
+      ? {
+          latitude: place.location.latitude,
+          longitude: place.location.longitude,
+        }
+      : undefined,
+    addressComponents: place.addressComponents || [],
+    businessStatus: place.businessStatus || 'OPERATIONAL',
     editorialSummary: place.editorialSummary?.text || '',
     photosCount: place.photos?.length || 0,
+    accessibilityOptions: place.accessibilityOptions,
+    paymentOptions: place.paymentOptions,
+    parkingOptions: place.parkingOptions,
     openingHours: {
       openNow: place.regularOpeningHours?.openNow,
       weekdayDescriptions: place.regularOpeningHours?.weekdayDescriptions || [],
+      periods: place.regularOpeningHours?.periods,
     },
   };
 }

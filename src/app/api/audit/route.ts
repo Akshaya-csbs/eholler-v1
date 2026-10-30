@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseMapUrl, fetchGooglePlaceData, fetchLocalCompetitors } from '@/lib/google-places';
 import { scrapeWebsite } from '@/lib/website-scraper';
 import { runLocalSeoAudit } from '@/lib/audit-engine';
+import { executeGbpCompleteAudit } from '@/lib/gbp-audit-engine';
 import { generateAiRecommendationsV2 } from '@/lib/ai-recommendation-service';
 import { AuditResponse } from '@/lib/types';
 import { emptySearchConsoleMetrics } from '@/lib/gsc-metrics';
@@ -96,7 +97,15 @@ export async function POST(req: NextRequest) {
       auditEngineResult.inconsistentFields,
     );
 
-    // 8. Dynamic Scores Calculation based on real profile signals
+    // 8. Complete AI-Powered Google Business Profile Audit
+    let gbpCompleteAudit = undefined;
+    try {
+      gbpCompleteAudit = await executeGbpCompleteAudit(placeData, siteAudit);
+    } catch (gbpErr) {
+      console.error('Error executing GBP complete audit:', gbpErr);
+    }
+
+    // 9. Dynamic Scores Calculation based on real profile signals
     const rating = placeData.rating || 0;
     const reviewCount = placeData.userRatingCount || 0;
     const photosCount = placeData.photosCount || 0;
@@ -160,6 +169,7 @@ export async function POST(req: NextRequest) {
       inconsistentFields: auditEngineResult.inconsistentFields,
       whatNeedsToBeAdded: auditEngineResult.whatNeedsToBeAdded,
       structuredRecommendations: aiResult.structuredRecommendations,
+      gbpCompleteAudit,
     };
 
     return NextResponse.json(response);
