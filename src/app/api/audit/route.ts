@@ -170,6 +170,7 @@ export async function POST(req: NextRequest) {
       whatNeedsToBeAdded: auditEngineResult.whatNeedsToBeAdded,
       structuredRecommendations: aiResult.structuredRecommendations,
       gbpCompleteAudit,
+      aiError: aiResult.aiError,
     };
 
     return NextResponse.json(response);

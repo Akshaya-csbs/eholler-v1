@@ -242,6 +242,7 @@ export interface AuditResponse {
   whatNeedsToBeAdded: string[];
   structuredRecommendations?: StructuredRecommendation[];
   gbpCompleteAudit?: GbpCompleteAuditResult;
+  aiError?: string;
 }
 
 export interface StructuredRecommendation {

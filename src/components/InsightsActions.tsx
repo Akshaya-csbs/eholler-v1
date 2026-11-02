@@ -155,8 +155,8 @@ export const InsightsActions: React.FC<InsightsActionsProps> = ({ data, onOpenAu
 
   // AI recommendations loading / retry state
   const [isLoadingAIRecs, setIsLoadingAIRecs] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [retryableError, setRetryableError] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(data.aiError || null);
+  const [retryableError, setRetryableError] = useState(true);
   const [localStructuredRecs, setLocalStructuredRecs] = useState<StructuredRecommendation[] | undefined>(structuredRecommendations);
   const [localDescriptionDraft, setLocalDescriptionDraft] = useState<string>(optimizedDescriptionDraft);
 
@@ -320,16 +320,25 @@ export const InsightsActions: React.FC<InsightsActionsProps> = ({ data, onOpenAu
               </div>
             )}
 
-            {/* Legacy flat recommendations (fallback) */}
+            {/* Legacy flat recommendations or empty state */}
             {!isLoadingAIRecs && !hasStructuredRecs && !aiError && (
-              <ul className="space-y-3.5">
-                {aiRecommendations.map((rec, index) => (
-                  <li key={index} className="flex items-start gap-2.5 text-xs text-gray-700 leading-relaxed">
-                    <span className="w-2 h-2 rounded-full bg-orange-600 shrink-0 mt-1.5" />
-                    <span>{rec}</span>
-                  </li>
-                ))}
-              </ul>
+              aiRecommendations.length > 0 ? (
+                <ul className="space-y-3.5">
+                  {aiRecommendations.map((rec, index) => (
+                    <li key={index} className="flex items-start gap-2.5 text-xs text-gray-700 leading-relaxed">
+                      <span className="w-2 h-2 rounded-full bg-orange-600 shrink-0 mt-1.5" />
+                      <span>{rec}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="py-6 text-center text-xs text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200 p-4">
+                  <p className="font-semibold text-gray-700">No AI recommendations available</p>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Click &quot;Refresh&quot; above to generate live OpenAI recommendations based on this business audit.
+                  </p>
+                </div>
+              )
             )}
           </div>
 

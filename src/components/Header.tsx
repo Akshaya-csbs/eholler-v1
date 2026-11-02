@@ -21,7 +21,26 @@ export const Header: React.FC<HeaderProps> = ({
   gscConnected = false,
   onOpenGscModal,
 }) => {
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div className="bg-white border-b border-gray-200 px-8 py-5 flex items-center justify-between">
+        <div>
+          <div className="text-xs text-gray-500 font-medium">Local SEO Platform</div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Business Profile Auditor</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onOpenAuditModal}
+            disabled={isLoading}
+            className="px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-[#C84A22] hover:bg-[#B33E1A] shadow-sm flex items-center gap-2 transition disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>{isLoading ? 'Analyzing...' : 'Run Analysis'}</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const { business } = data;
   const cleanWebsite = business.websiteUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');

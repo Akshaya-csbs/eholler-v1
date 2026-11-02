@@ -262,9 +262,9 @@ export async function generateStructuredRecommendations(
 // ── Legacy-compatible wrapper ───────────────────────────────────────
 
 /**
- * Drop-in replacement for the old generateAiRecommendations function.
- * Falls back to defaults if the API key is missing or the call fails.
- * Used by the existing /api/audit route.
+ * Generates AI recommendations and Google Business Profile draft copy.
+ * Strictly avoids returning mock fallback data when the OpenAI API fails
+ * or is unconfigured; instead, errors are surfaced clearly to the user.
  */
 export async function generateAiRecommendationsV2(
   place: GooglePlaceData,
@@ -278,6 +278,7 @@ export async function generateAiRecommendationsV2(
   recommendations: string[];
   descriptionDraft: string;
   structuredRecommendations?: StructuredRecommendation[];
+  aiError?: string;
 }> {
   const bizName = place.displayName || 'Business';
   const category = place.primaryType || 'Consultant';
@@ -286,22 +287,11 @@ export async function generateAiRecommendationsV2(
   const reviewCount = place.userRatingCount || 0;
   const rating = place.rating || 0;
 
-  // Fallback defaults (preserved from original code)
-  const defaultRecommendations = [
-    `Launch an automated review collection campaign targeting existing and past clients to aggressively grow review volume from ${reviewCount} toward at least 150+ high-quality Google reviews.`,
-    website.startsWith('http://') || !siteAudit?.isHttps
-      ? `Upgrade the website security by installing an SSL certificate and redirecting all traffic from HTTP to secure HTTPS ('${website.replace('http://', 'https://')}').`
-      : `Implement LocalBusiness JSON-LD Schema markup on ${website} to reinforce Name, Address, and Phone (NAP) parity for Google search crawlers.`,
-    `Post weekly updates on the Google Business Profile featuring case studies, ${category} tips, and recent client outcomes to boost local engagement metrics.`,
-    `Optimize Google Business Profile secondary categories and expand service catalog with specific service deliverables.`,
-  ];
-
-  const defaultDescription = `${bizName} is a premier ${category} dedicated to serving clients across ${city} and neighboring areas. We offer high-quality ${category} services, customer-first support, and dependable results (${rating}★ rating from ${reviewCount} client reviews). Our team is committed to excellence, transparent communication, and tailored solutions. Contact us today or visit our location in ${city} for inquiries or to schedule an appointment.`;
-
   if (!process.env.OPENAI_API_KEY) {
     return {
-      recommendations: defaultRecommendations,
-      descriptionDraft: defaultDescription,
+      recommendations: [],
+      descriptionDraft: '',
+      aiError: 'OpenAI API key is not configured in .env.local. Add OPENAI_API_KEY to generate live AI recommendations.',
     };
   }
 
@@ -325,19 +315,19 @@ export async function generateAiRecommendationsV2(
       inconsistentFields,
     });
 
-    // Return both the legacy flat list AND the new structured recs
     return {
       recommendations: result.recommendations.map(
         (r) => `[${r.severity.toUpperCase()}] ${r.issueTitle}: ${r.recommendedAction}`
       ),
-      descriptionDraft: result.descriptionDraft || defaultDescription,
+      descriptionDraft: result.descriptionDraft || '',
       structuredRecommendations: result.recommendations,
     };
   } catch (err: any) {
-    console.warn('OpenAI structured recommendations failed, using fallback:', err.message);
+    console.warn('OpenAI structured recommendations failed:', err.message);
     return {
-      recommendations: defaultRecommendations,
-      descriptionDraft: defaultDescription,
+      recommendations: [],
+      descriptionDraft: '',
+      aiError: err.message || 'Failed to generate AI recommendations.',
     };
   }
 }
