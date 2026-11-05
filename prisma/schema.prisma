@@ -1,0 +1,421 @@
+// ==============================================================================
+// Prisma Schema for eholler / Blazly Local SEO Multi-Tenant SaaS
+// Compatible with Neon PostgreSQL (pooled queries + direct migration)
+// ==============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── Enumerations ─────────────────────────────────────────────────────────────
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum BusinessStatus {
+  ACTIVE
+  ARCHIVED
+  PENDING
+}
+
+enum SourceType {
+  GOOGLE_PLACES
+  WEBSITE
+  GOOGLE_SEARCH_CONSOLE
+  GOOGLE_ANALYTICS
+}
+
+enum ConnectionStatus {
+  CONNECTED
+  EXPIRED
+  REVOKED
+  ERROR
+}
+
+enum AuditStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum GBPFieldStatus {
+  NO_CHANGES_REQUIRED
+  MISSING
+  NEEDS_IMPROVEMENT
+  UNABLE_TO_VERIFY
+}
+
+enum RecommendationCategory {
+  MISSING_SEO_FIELD
+  INCONSISTENT_INFO
+  INCOMPLETE_DESCRIPTION
+  MISSING_META
+  CONTENT_OPTIMIZATION
+  SEARCH_CONSOLE
+  LOCAL_SEO_PRIORITY
+}
+
+enum SeverityLevel {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum EffortLevel {
+  QUICK_WIN
+  MODERATE
+  SIGNIFICANT
+}
+
+enum RecommendationStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+  APPLIED
+}
+
+// ── Identity & Access Control ────────────────────────────────────────────────
+
+model User {
+  id                      String                   @id @default(cuid())
+  email                   String                   @unique
+  name                    String?
+  avatarUrl               String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+
+  memberships             OrganisationMembership[]
+  auditRunsTriggered      AuditRun[]               @relation("UserTriggeredAudits")
+  approvedRecommendations AIRecommendation[]       @relation("UserApprovedRecommendations")
+
+  @@index([email])
+}
+
+model Organisation {
+  id                         String                      @id @default(cuid())
+  name                       String
+  slug                       String                      @unique
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+
+  memberships                OrganisationMembership[]
+  businesses                 Business[]
+  googleConnections          GoogleConnection[]
+  searchConsoleProperties    SearchConsoleProperty[]
+  analyticsProperties        AnalyticsProperty[]
+  businessSources            BusinessSource[]
+  auditRuns                  AuditRun[]
+  sourceSnapshots            SourceSnapshot[]
+  gbpFieldAudits             GBPFieldAudit[]
+  aiRecommendations          AIRecommendation[]
+  searchPerformanceSnapshots SearchPerformanceSnapshot[]
+  analyticsSnapshots         AnalyticsSnapshot[]
+
+  @@index([slug])
+}
+
+model OrganisationMembership {
+  id             String       @id @default(cuid())
+  organisationId String
+  userId         String
+  role           OrgRole      @default(MEMBER)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organisationId, userId])
+  @@index([organisationId])
+  @@index([userId])
+}
+
+// ── Business Management ──────────────────────────────────────────────────────
+
+model Business {
+  id                         String                      @id @default(cuid())
+  organisationId             String
+  name                       String
+  slug                       String?
+  placeId                    String?
+  formattedAddress           String?                     @db.Text
+  city                       String?
+  category                   String?
+  phone                      String?
+  websiteUrl                 String?                     @db.Text
+  mapUrl                     String?                     @db.Text
+  rating                     Float?
+  reviewCount                Int?                        @default(0)
+  status                     BusinessStatus              @default(ACTIVE)
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+
+  organisation               Organisation                @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  sources                    BusinessSource[]
+  auditRuns                  AuditRun[]
+  gbpFieldAudits             GBPFieldAudit[]
+  aiRecommendations          AIRecommendation[]
+  sourceSnapshots            SourceSnapshot[]
+  searchPerformanceSnapshots SearchPerformanceSnapshot[]
+  analyticsSnapshots         AnalyticsSnapshot[]
+
+  @@index([organisationId])
+  @@index([placeId])
+  @@index([status])
+}
+
+model BusinessSource {
+  id               String       @id @default(cuid())
+  businessId       String
+  organisationId   String
+  sourceType       SourceType
+  sourceIdentifier String?      // e.g. Place ID, Website domain, GSC siteUrl
+  config           Json?
+  isConnected      Boolean      @default(true)
+  lastSyncedAt     DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  business         Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  organisation     Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, sourceType, sourceIdentifier])
+  @@index([businessId])
+  @@index([organisationId])
+}
+
+// ── Integrations & OAuth Credentials ─────────────────────────────────────────
+
+model GoogleConnection {
+  id                    String                  @id @default(cuid())
+  organisationId        String
+  email                 String
+  googleUserId          String?
+  // Tokens are encrypted using AES-256-GCM before storage; never stored as plaintext
+  encryptedAccessToken  String                  @db.Text
+  encryptedRefreshToken String?                 @db.Text
+  tokenExpiry           DateTime?
+  scopes                String[]
+  status                ConnectionStatus        @default(CONNECTED)
+  connectedAt           DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  organisation          Organisation            @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  scProperties          SearchConsoleProperty[]
+  gaProperties          AnalyticsProperty[]
+
+  @@unique([organisationId, email])
+  @@index([organisationId])
+  @@index([status])
+}
+
+model SearchConsoleProperty {
+  id                   String                      @id @default(cuid())
+  googleConnectionId   String
+  organisationId       String
+  siteUrl              String
+  permissionLevel      String?
+  isSelected           Boolean                     @default(false)
+  verifiedAt           DateTime?
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+
+  googleConnection     GoogleConnection            @relation(fields: [googleConnectionId], references: [id], onDelete: Cascade)
+  organisation         Organisation                @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  performanceSnapshots SearchPerformanceSnapshot[]
+
+  @@unique([organisationId, siteUrl])
+  @@index([googleConnectionId])
+  @@index([organisationId])
+}
+
+model AnalyticsProperty {
+  id                 String              @id @default(cuid())
+  googleConnectionId String
+  organisationId     String
+  propertyId         String              // e.g. "properties/12345678"
+  displayName        String?
+  isSelected         Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  googleConnection   GoogleConnection    @relation(fields: [googleConnectionId], references: [id], onDelete: Cascade)
+  organisation       Organisation        @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  analyticsSnapshots AnalyticsSnapshot[]
+
+  @@unique([organisationId, propertyId])
+  @@index([googleConnectionId])
+  @@index([organisationId])
+}
+
+// ── Audits & Snapshots ───────────────────────────────────────────────────────
+
+model AuditRun {
+  id                      String             @id @default(cuid())
+  organisationId          String
+  businessId              String
+  status                  AuditStatus        @default(PENDING)
+  triggeredByUserId       String?
+  authorityScore          Int?
+  mapsRank                Int?
+  gbpHealthScore          Int?
+  completenessScore       Int?
+  missingFieldsCount      Int?               @default(0)
+  inconsistentFieldsCount Int?               @default(0)
+  summary                 String?            @db.Text
+  errorMessage            String?            @db.Text
+  startedAt               DateTime?
+  completedAt             DateTime?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  organisation            Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  business                Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  triggeredByUser         User?              @relation("UserTriggeredAudits", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+
+  fieldAudits             GBPFieldAudit[]
+  aiRecommendations       AIRecommendation[]
+  snapshots               SourceSnapshot[]
+
+  @@index([organisationId])
+  @@index([businessId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SourceSnapshot {
+  id             String       @id @default(cuid())
+  auditRunId     String
+  businessId     String
+  organisationId String
+  sourceType     SourceType
+  rawData        Json
+  metadata       Json?
+  capturedAt     DateTime     @default(now())
+
+  auditRun       AuditRun     @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+  business       Business     @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+
+  @@index([auditRunId])
+  @@index([businessId])
+  @@index([organisationId])
+}
+
+model GBPFieldAudit {
+  id                 String         @id @default(cuid())
+  auditRunId         String
+  organisationId     String
+  businessId         String
+  fieldId            String
+  fieldName          String
+  category           String
+  status             GBPFieldStatus
+  currentValue       String?        @db.Text
+  recommendedContent String?        @db.Text
+  whyItMatters       String?        @db.Text
+  action             String?        @db.Text
+  confidence         String?
+  applicable         Boolean        @default(true)
+  verifiable         Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+
+  auditRun           AuditRun       @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+  organisation       Organisation   @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  business           Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([auditRunId])
+  @@index([organisationId])
+  @@index([businessId])
+  @@index([status])
+}
+
+model AIRecommendation {
+  id                String                 @id @default(cuid())
+  auditRunId        String
+  organisationId    String
+  businessId        String
+  issueTitle        String
+  category          RecommendationCategory
+  evidence          String                 @db.Text
+  severity          SeverityLevel
+  explanation       String                 @db.Text
+  recommendedAction String                 @db.Text
+  suggestedContent  String?                @db.Text
+  estimatedEffort   EffortLevel
+  status            RecommendationStatus   @default(DRAFT)
+  approvedAt        DateTime?
+  approvedByUserId  String?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  auditRun          AuditRun               @relation(fields: [auditRunId], references: [id], onDelete: Cascade)
+  organisation      Organisation           @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  business          Business               @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  approvedByUser    User?                  @relation("UserApprovedRecommendations", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([auditRunId])
+  @@index([organisationId])
+  @@index([businessId])
+  @@index([status])
+  @@index([severity])
+}
+
+// ── Search & Analytics Snapshots ─────────────────────────────────────────────
+
+model SearchPerformanceSnapshot {
+  id                      String                @id @default(cuid())
+  searchConsolePropertyId String
+  organisationId          String
+  businessId              String?
+  dateRangeStart          DateTime
+  dateRangeEnd            DateTime
+  totalClicks             Int                   @default(0)
+  totalImpressions        Int                   @default(0)
+  averageCtr              Float                 @default(0)
+  averagePosition         Float                 @default(0)
+  queryData               Json?
+  capturedAt              DateTime              @default(now())
+
+  property                SearchConsoleProperty @relation(fields: [searchConsolePropertyId], references: [id], onDelete: Cascade)
+  organisation            Organisation          @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  business                Business?             @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  @@index([searchConsolePropertyId])
+  @@index([organisationId])
+  @@index([capturedAt])
+}
+
+model AnalyticsSnapshot {
+  id                  String            @id @default(cuid())
+  analyticsPropertyId String
+  organisationId      String
+  businessId          String?
+  dateRangeStart      DateTime
+  dateRangeEnd        DateTime
+  activeUsers         Int               @default(0)
+  sessions            Int               @default(0)
+  bounceRate          Float?
+  metricsData         Json?
+  capturedAt          DateTime          @default(now())
+
+  property            AnalyticsProperty @relation(fields: [analyticsPropertyId], references: [id], onDelete: Cascade)
+  organisation        Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  business            Business?         @relation(fields: [businessId], references: [id], onDelete: SetNull)
+
+  @@index([analyticsPropertyId])
+  @@index([organisationId])
+  @@index([capturedAt])
+}
+
