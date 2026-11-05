@@ -67,19 +67,45 @@ export const GbpAuditView: React.FC<GbpAuditViewProps> = ({
 
   if (!auditResult) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center max-w-xl mx-auto my-12 shadow-sm">
-        <Sparkles className="w-12 h-12 text-orange-500 mx-auto mb-4 animate-pulse" />
-        <h3 className="text-lg font-bold text-gray-900">No Google Business Profile Audit Data</h3>
-        <p className="text-xs text-gray-500 mt-2">
-          Please run an audit with a valid Google Maps URL or business query from the dashboard above to view the complete field-by-field audit.
+      <div className="bg-white rounded-2xl border border-gray-200 p-10 text-center max-w-2xl mx-auto my-12 shadow-sm">
+        <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center mx-auto mb-4">
+          <Sparkles className="w-7 h-7 text-[#C84A22]" />
+        </div>
+        <h3 className="text-xl font-bold text-gray-900">Google Business Profile Audit</h3>
+        <p className="text-xs text-gray-500 mt-2 max-w-md mx-auto leading-relaxed">
+          No audit data is currently selected. Run an audit from the dashboard by entering any valid Google Maps URL, Place ID, or business name to evaluate all 57 profile fields.
         </p>
+
+        {/* Audit Modes Explanation */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-left mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div className="p-3 bg-white rounded-lg border border-slate-100 shadow-2xs">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+              <span>Mode A: Public Maps & Website</span>
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1 leading-normal">
+              Works for any resolvable Google Maps Place ID. Evaluates public profile signals, category alignment, and website cross-verification.
+            </p>
+          </div>
+
+          <div className="p-3 bg-white rounded-lg border border-slate-100 shadow-2xs">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>Mode B: Connected Profile</span>
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1 leading-normal">
+              Requires Google Business Profile owner or manager authorization. Unlocks private messaging, call analytics, and manager roles.
+            </p>
+          </div>
+        </div>
+
         {onBackToDashboard && (
           <button
             onClick={onBackToDashboard}
-            className="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-[#C84A22] text-white text-xs font-semibold rounded-lg hover:bg-[#B33E1A] transition"
+            className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-[#C84A22] text-white text-xs font-semibold rounded-xl hover:bg-[#B33E1A] shadow-sm transition"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Return to Dashboard</span>
+            <span>Go to Dashboard to Run Audit</span>
           </button>
         )}
       </div>
@@ -263,6 +289,18 @@ export const GbpAuditView: React.FC<GbpAuditViewProps> = ({
                 <span>AI-Powered GBP Audit</span>
               </span>
               <span className="text-xs text-gray-400">·</span>
+              {auditResult.auditMode === 'connected_gbp' || auditResult.gbpConnected ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold">
+                  <BadgeCheck className="w-3 h-3 text-emerald-600" />
+                  <span>Mode B: Connected Profile</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-semibold">
+                  <Info className="w-3 h-3 text-blue-600" />
+                  <span>Mode A: Public Maps & Website</span>
+                </span>
+              )}
+              <span className="text-xs text-gray-400">·</span>
               <span className="text-xs text-gray-500">Audited {business.lastAuditedAt}</span>
             </div>
 
@@ -304,6 +342,15 @@ export const GbpAuditView: React.FC<GbpAuditViewProps> = ({
                 </a>
               )}
             </div>
+
+            {(!auditResult.gbpConnected && auditResult.auditMode !== 'connected_gbp') && (
+              <div className="mt-3.5 inline-flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-600">
+                <Info className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span>
+                  <strong>Mode A Audit:</strong> Evaluated using public Google Places data and website crawl. Fields requiring owner or manager permissions are marked as <em>Unable to verify</em>.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Quick Action Button to jump to AI Content */}

@@ -13,6 +13,27 @@ const AUDIT_CACHE = new Map<string, { result: GbpCompleteAuditResult; timestamp:
 const CACHE_TTL_MS = 1000 * 60 * 30; // 30 minutes cache
 
 /**
+ * Safe helper: returns true if the given address component has the specified type.
+ * Guards against components where Google Places API omits the `types` array entirely
+ * (e.g. unnamed building components, landmarks, or subpremise entries without postal types).
+ */
+function componentHasType(component: { types?: string[]; longText?: string }, type: string): boolean {
+  return Array.isArray(component.types) && component.types.includes(type);
+}
+
+/**
+ * Find the first address component that matches any of the given type strings.
+ * Safe against components without a `types` array.
+ */
+function findAddressComponent(
+  components: Array<{ types?: string[]; longText?: string; shortText?: string }> | undefined | null,
+  ...types: string[]
+): { types?: string[]; longText?: string; shortText?: string } | undefined {
+  if (!Array.isArray(components)) return undefined;
+  return components.find(c => Array.isArray(c.types) && types.some(t => c.types!.includes(t)));
+}
+
+/**
  * 1. Build a deep, factual understanding of the business from all available sources
  */
 export function buildBusinessUnderstanding(
@@ -24,7 +45,7 @@ export function buildBusinessUnderstanding(
   const address = place.formattedAddress || '';
   const city =
     address.split(',').slice(-4, -2).join(', ').trim() ||
-    (place.addressComponents?.find(c => c.types.includes('locality'))?.longText) ||
+    findAddressComponent(place.addressComponents, 'locality')?.longText ||
     'Local Area';
 
   // Extract services from website
@@ -404,7 +425,7 @@ export function evaluateAllGbpFields(
   });
 
   // 11. Street Address
-  const streetComp = place.addressComponents?.find(c => c.types.includes('route') || c.types.includes('street_address'));
+  const streetComp = findAddressComponent(place.addressComponents, 'route', 'street_address');
   addField({
     field_id: 'street_address',
     field_name: 'Street Address',
@@ -423,7 +444,7 @@ export function evaluateAllGbpFields(
   });
 
   // 12. Locality / City
-  const localityComp = place.addressComponents?.find(c => c.types.includes('locality') || c.types.includes('sublocality'));
+  const localityComp = findAddressComponent(place.addressComponents, 'locality', 'sublocality');
   addField({
     field_id: 'locality_city',
     field_name: 'Locality / City',
@@ -442,7 +463,7 @@ export function evaluateAllGbpFields(
   });
 
   // 13. State / Region
-  const stateComp = place.addressComponents?.find(c => c.types.includes('administrative_area_level_1'));
+  const stateComp = findAddressComponent(place.addressComponents, 'administrative_area_level_1');
   addField({
     field_id: 'administrative_area',
     field_name: 'State / Region / Province',
@@ -461,7 +482,7 @@ export function evaluateAllGbpFields(
   });
 
   // 14. Postal Code
-  const postalComp = place.addressComponents?.find(c => c.types.includes('postal_code'));
+  const postalComp = findAddressComponent(place.addressComponents, 'postal_code');
   addField({
     field_id: 'postal_code',
     field_name: 'Postal / PIN Code',
@@ -480,7 +501,7 @@ export function evaluateAllGbpFields(
   });
 
   // 15. Country
-  const countryComp = place.addressComponents?.find(c => c.types.includes('country'));
+  const countryComp = findAddressComponent(place.addressComponents, 'country');
   addField({
     field_id: 'country',
     field_name: 'Country',
@@ -1360,10 +1381,20 @@ Return strictly JSON with keys:
 
 /**
  * 4. Run the Complete Google Business Profile Audit Pipeline
+ *
+ * MODE A — Public Maps and Website Audit (default):
+ *   Works for any resolvable Google Maps Place ID.
+ *   Uses Google Places API (public) and crawled website evidence.
+ *   GBP-owner-only fields are labelled UNABLE TO VERIFY with a clear explanation.
+ *
+ * MODE B — Connected Google Business Profile Audit:
+ *   Active when gbpConnected=true is passed.
+ *   Would integrate authorized GBP Management API signals in future.
  */
 export async function executeGbpCompleteAudit(
   place: GooglePlaceData,
-  siteAudit?: WebsiteAuditData
+  siteAudit?: WebsiteAuditData,
+  gbpConnected = false
 ): Promise<GbpCompleteAuditResult> {
   const cacheKey = place.id || place.displayName || 'default';
   const cached = AUDIT_CACHE.get(cacheKey);
@@ -1432,6 +1463,8 @@ export async function executeGbpCompleteAudit(
     }));
 
   const result: GbpCompleteAuditResult = {
+    auditMode: gbpConnected ? 'connected_gbp' : 'public_maps_and_website',
+    gbpConnected,
     business: {
       name: place.displayName,
       category: understanding.primaryCategory,

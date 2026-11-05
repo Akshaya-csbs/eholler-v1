@@ -59,6 +59,31 @@ export interface WebsiteAuditData {
   appointmentUrl?: string;
   contactEmails?: string[];
   aboutSnippet?: string;
+  canonicalUrl?: string;
+  robotsDirectives?: string;
+  h1Headings?: string[];
+  h2Headings?: string[];
+  internalLinksCount?: number;
+  images?: {
+    total: number;
+    withAlt: number;
+    missingAlt: number;
+    sampleAltTexts?: string[];
+  };
+  schemasFound?: string[];
+  subpagesCrawled?: Array<{
+    url: string;
+    title?: string;
+    type: 'contact' | 'about' | 'services' | 'location' | 'other';
+    statusCode?: number;
+  }>;
+  napConsistency?: {
+    nameFound?: boolean;
+    phoneFound?: boolean;
+    addressFound?: boolean;
+    detectedPhone?: string;
+    detectedAddress?: string;
+  };
 }
 
 export type GbpFieldStatus =
@@ -112,7 +137,16 @@ export interface BusinessUnderstanding {
   crossCheckNotes: string[];
 }
 
+export type GbpAuditMode = 'public_maps_and_website' | 'connected_gbp';
+
 export interface GbpCompleteAuditResult {
+  /**
+   * MODE A: 'public_maps_and_website' — Google Places API + website data, no GBP OAuth required.
+   * MODE B: 'connected_gbp' — Authorized Google Business Profile management API.
+   * Defaults to 'public_maps_and_website' when no GBP OAuth account is connected.
+   */
+  auditMode: GbpAuditMode;
+  gbpConnected: boolean;
   business: {
     name: string;
     category: string;
@@ -145,13 +179,48 @@ export interface GbpCompleteAuditResult {
   }[];
 }
 
+export interface TargetServiceProfile {
+  businessName?: string;
+  website?: string;
+  mapsCategory?: string;
+  actualBusinessType?: string;
+  mainService: string;
+  primaryServices: string[];
+  secondaryServices: string[];
+  productsAndSolutions?: string[];
+  industriesServed?: string[];
+  targetCustomers: string;
+  serviceLocations?: string[];
+  serviceArea: string;
+  serviceKeywords: string[];
+  excludedServices: string[];
+  evidenceUrls?: string[];
+  confidenceScore?: number; // 0 - 100
+  confidence: 'high' | 'medium' | 'limited';
+  conflictNotes?: string[];
+  sourceSummary?: string;
+  isServiceProfileValidated?: boolean;
+  validationFailureReason?: string;
+}
+
 export interface CompetitorItem {
   id: string;
   name: string;
-  rating: number;
-  reviews: number;
+  rating?: number;
+  reviews?: number;
   address?: string;
   isDominant?: boolean;
+  category?: string;
+  relevanceScore?: number; // 0 to 100%
+  classification?: 'direct' | 'related' | 'excluded';
+  rationale?: string;
+  websiteUri?: string;
+  mapUrl?: string;
+  mainServiceIdentified?: string;
+  matchedTargetService?: string;
+  evidenceConfidence?: 'high' | 'medium' | 'limited';
+  evidenceSourceUrl?: string;
+  comparisonReason?: string;
 }
 
 export interface AuditFinding {
@@ -237,11 +306,16 @@ export interface AuditResponse {
   aiRecommendations: string[];
   optimizedDescriptionDraft: string;
   competitors: CompetitorItem[];
+  directCompetitors?: CompetitorItem[];
+  relatedCompetitors?: CompetitorItem[];
+  targetServiceProfile?: TargetServiceProfile;
   missingFields: string[];
   inconsistentFields: string[];
   whatNeedsToBeAdded: string[];
   structuredRecommendations?: StructuredRecommendation[];
   gbpCompleteAudit?: GbpCompleteAuditResult;
+  websiteAudit?: WebsiteAuditData;
+  auditRunId?: string;
   aiError?: string;
 }
 
