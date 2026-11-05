@@ -1,4 +1,4 @@
-# eholler - Local SEO AI Agent SaaS (Blazly)
+# Eholler Local SEO - Local SEO AI Agent Platform
 
 A Next.js & TypeScript Local SEO AI Agent platform designed to audit, monitor, and optimize Google Business Profiles and local search performance.
 

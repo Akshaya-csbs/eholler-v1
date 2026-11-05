@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Blazly Local SEO | AI Agent Dashboard',
+  title: 'Eholler Local SEO | AI Agent Dashboard',
   description: 'AI-Powered Local SEO Audit, Google Business Profile & Google Search Console Analytics',
 };
 

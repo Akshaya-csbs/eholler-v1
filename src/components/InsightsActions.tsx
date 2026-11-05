@@ -22,6 +22,7 @@ import { AuditResponse, StructuredRecommendation } from '@/lib/types';
 interface InsightsActionsProps {
   data: AuditResponse;
   onOpenAuditDrawer: () => void;
+  onOpenCompetitors?: () => void;
 }
 
 // Category display config
@@ -148,7 +149,7 @@ function RecommendationCard({ rec, index }: { rec: StructuredRecommendation; ind
   );
 }
 
-export const InsightsActions: React.FC<InsightsActionsProps> = ({ data, onOpenAuditDrawer }) => {
+export const InsightsActions: React.FC<InsightsActionsProps> = ({ data, onOpenAuditDrawer, onOpenCompetitors }) => {
   const { priorityActions, aiRecommendations, competitors, optimizedDescriptionDraft, structuredRecommendations } = data;
   const [copied, setCopied] = useState(false);
   const [showDescriptionModal, setShowDescriptionModal] = useState(false);
@@ -358,32 +359,77 @@ export const InsightsActions: React.FC<InsightsActionsProps> = ({ data, onOpenAu
         {/* Column 3: Top Competitors (3 cols) */}
         <div className="lg:col-span-3 bg-white rounded-xl p-5 border border-gray-100 shadow-sm flex flex-col justify-between">
           <div>
-            <h3 className="text-sm font-bold text-gray-900 mb-4">Top Competitors</h3>
-
-            <div className="space-y-4">
-              {competitors.slice(0, 3).map((comp) => (
-                <div key={comp.id} className="pb-3 border-b border-gray-50 last:border-0 last:pb-0">
-                  <div className="flex items-start justify-between gap-1">
-                    <span className="text-xs font-semibold text-gray-900 leading-snug truncate">
-                      {comp.name}
-                    </span>
-                    <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
-                    <span className="font-bold text-gray-900 flex items-center gap-0.5">
-                      {comp.rating}
-                      <Star className="w-3 h-3 fill-amber-400 text-amber-400 inline" />
-                    </span>
-                    <span>·</span>
-                    <span>{comp.reviews} reviews</span>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-gray-900">Top Competitors</h3>
+              {(data.directCompetitors?.length || competitors.length) > 0 && (
+                <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                  {data.directCompetitors?.length || competitors.length} direct
+                </span>
+              )}
             </div>
+
+            {competitors.length === 0 ? (
+              <div className="py-6 text-center text-xs text-gray-500 space-y-1">
+                <p className="font-semibold text-gray-700">No qualifying competitors</p>
+                <p className="text-[11px] text-gray-400">
+                  No local profiles in this area met the service-relevance criteria.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3.5">
+                {(data.directCompetitors && data.directCompetitors.length > 0
+                  ? data.directCompetitors
+                  : competitors
+                )
+                  .slice(0, 3)
+                  .map((comp) => (
+                    <div key={comp.id} className="pb-3 border-b border-gray-50 last:border-0 last:pb-0">
+                      <div className="flex items-start justify-between gap-1">
+                        <span className="text-xs font-semibold text-gray-900 leading-snug truncate">
+                          {comp.name}
+                        </span>
+                        {comp.relevanceScore !== undefined && (
+                          <span className="text-[10px] font-bold text-orange-700 bg-orange-50 px-1.5 py-0.5 rounded shrink-0">
+                            {comp.relevanceScore}% match
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
+                        <span className="font-bold text-gray-900 flex items-center gap-0.5">
+                          {comp.rating ? comp.rating.toFixed(1) : '—'}
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400 inline" />
+                        </span>
+                        <span>·</span>
+                        <span>{comp.reviews} reviews</span>
+                        {comp.classification && (
+                          <>
+                            <span>·</span>
+                            <span
+                              className={`text-[10px] font-semibold uppercase tracking-wider ${
+                                comp.classification === 'direct' ? 'text-red-600' : 'text-blue-600'
+                              }`}
+                            >
+                              {comp.classification}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {comp.matchedTargetService && (
+                        <div className="text-[10px] text-gray-500 mt-1 truncate">
+                          Matches: <span className="font-medium text-gray-700">{comp.matchedTargetService}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-4 pt-3 border-t border-gray-100">
-            <button className="text-xs font-semibold text-gray-500 hover:text-orange-600 transition flex items-center gap-1">
+            <button
+              onClick={onOpenCompetitors}
+              className="text-xs font-semibold text-gray-500 hover:text-orange-600 transition flex items-center gap-1"
+            >
               <span>View competitor analysis</span>
               <span>&rarr;</span>
             </button>

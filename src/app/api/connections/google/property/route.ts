@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getValidAccessToken, isGscConnected, saveSelectedProperty } from '@/lib/gsc-tokens';
+import { getValidAccessToken, isGscConnectedWithDb, saveSelectedProperty } from '@/lib/gsc-tokens';
 import { listSearchConsoleProperties } from '@/lib/gsc-api';
+import { getDefaultOrgScope } from '@/lib/db/default-org';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
-  if (!isGscConnected()) {
+  const isConnected = await isGscConnectedWithDb();
+  if (!isConnected) {
     return NextResponse.json(
       { error: 'Google Search Console is not connected.' },
       { status: 401 }
@@ -41,6 +44,24 @@ export async function POST(req: NextRequest) {
     }
 
     saveSelectedProperty(match.siteUrl);
+
+    // Sync selected flag in database
+    try {
+      const orgScope = await getDefaultOrgScope();
+      await prisma.$transaction([
+        prisma.searchConsoleProperty.updateMany({
+          where: { organisationId: orgScope.organisationId },
+          data: { isSelected: false },
+        }),
+        prisma.searchConsoleProperty.updateMany({
+          where: { organisationId: orgScope.organisationId, siteUrl: match.siteUrl },
+          data: { isSelected: true },
+        }),
+      ]);
+    } catch (dbErr) {
+      console.warn('Could not update selected property in database (non-fatal):', dbErr);
+    }
+
     return NextResponse.json({ selectedProperty: match.siteUrl });
   } catch (err: any) {
     return NextResponse.json(

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, RefreshCw, AlertTriangle, Layers } from 'lucide-react';
+import { ExternalLink, RefreshCw, AlertTriangle, Layers, PlusCircle } from 'lucide-react';
 import { AuditResponse } from '@/lib/types';
 
 interface HeaderProps {
@@ -8,6 +8,7 @@ interface HeaderProps {
   isLoading: boolean;
   onOpenAuditModal: () => void;
   onOpenDrawer: () => void;
+  onNewAudit?: () => void;
   gscConnected?: boolean;
   onOpenGscModal?: () => void;
 }
@@ -18,6 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   isLoading,
   onOpenAuditModal,
   onOpenDrawer,
+  onNewAudit,
   gscConnected = false,
   onOpenGscModal,
 }) => {
@@ -25,7 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
     return (
       <div className="bg-white border-b border-gray-200 px-8 py-5 flex items-center justify-between">
         <div>
-          <div className="text-xs text-gray-500 font-medium">Local SEO Platform</div>
+          <div className="text-xs text-gray-500 font-medium">Eholler Local SEO Platform</div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Business Profile Auditor</h1>
         </div>
         <div className="flex items-center gap-3">
@@ -99,15 +101,27 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Action Button: Run analysis */}
-      <div className="flex items-center gap-3 shrink-0">
+      {/* Action Buttons: New Audit + Re-run analysis */}
+      <div className="flex items-center gap-2.5 shrink-0">
+        {onNewAudit && (
+          <button
+            onClick={onNewAudit}
+            disabled={isLoading}
+            className="px-4 py-2 rounded-lg text-xs font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 shadow-sm flex items-center gap-1.5 transition disabled:opacity-50"
+            title="Start audit for another business"
+          >
+            <PlusCircle className="w-3.5 h-3.5 text-gray-500" />
+            <span>New Audit</span>
+          </button>
+        )}
         <button
-          onClick={onOpenAuditModal}
+          onClick={onRefresh}
           disabled={isLoading}
-          className="px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-[#C84A22] hover:bg-[#B33E1A] shadow-sm flex items-center gap-2 transition disabled:opacity-50"
+          className="px-5 py-2 rounded-lg text-xs font-semibold text-white bg-[#C84A22] hover:bg-[#B33E1A] shadow-sm flex items-center gap-2 transition disabled:opacity-50"
+          title="Re-run analysis on this profile"
         >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          <span>{isLoading ? 'Analyzing...' : 'Run analysis'}</span>
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          <span>{isLoading ? 'Re-evaluating...' : 'Re-run Analysis'}</span>
         </button>
       </div>
     </div>

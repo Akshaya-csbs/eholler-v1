@@ -38,7 +38,9 @@ export const OptimizationProgress: React.FC<OptimizationProgressProps> = ({ scor
           <div key={i} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
             <div className="flex items-center justify-between text-xs font-semibold text-gray-700 mb-2">
               <span>{bar.label}</span>
-              <span className="font-bold text-gray-900">{bar.value}%</span>
+              <span className="font-bold text-gray-900">
+                {bar.label === 'Keyword Rankings' && bar.value === 0 ? 'Requires GSC' : `${bar.value}%`}
+              </span>
             </div>
 
             <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">

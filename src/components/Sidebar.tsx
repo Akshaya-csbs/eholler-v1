@@ -2,6 +2,8 @@ import React from 'react';
 import {
   LayoutDashboard,
   FileCheck2,
+  Globe,
+  History,
   TrendingUp,
   Users2,
   ListTree,
@@ -14,6 +16,7 @@ import {
   LogOut,
   Lock,
   Zap,
+  PlusCircle,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -21,6 +24,7 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   onOpenAuditModal: () => void;
   onOpenGscModal: () => void;
+  onNewAudit?: () => void;
   gscConnected?: boolean;
 }
 
@@ -29,13 +33,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   onOpenAuditModal,
   onOpenGscModal,
+  onNewAudit,
   gscConnected = false,
 }) => {
   const mainNav = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, locked: false },
-    { id: 'profile-opt', label: 'Profile Optimization', icon: FileCheck2, locked: false },
-    { id: 'rank-tracker', label: 'Rank Tracker', icon: TrendingUp, locked: true },
+    { id: 'profile-opt', label: 'GBP Profile Audit', icon: FileCheck2, locked: false },
+    { id: 'website-seo', label: 'Website SEO & NAP', icon: Globe, locked: false },
+    { id: 'audit-history', label: 'Audit History', icon: History, locked: false },
     { id: 'competitor-analysis', label: 'Competitor Analysis', icon: Users2, locked: false },
+    { id: 'rank-tracker', label: 'Rank Tracker', icon: TrendingUp, locked: true },
     { id: 'directory-listings', label: 'Directory listings', icon: ListTree, locked: true },
     { id: 'review-mgmt', label: 'Review Management', icon: MessageSquare, locked: true },
     { id: 'enhance-images', label: 'Enhance Images', icon: Sparkles, locked: true },
@@ -52,7 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Zap className="w-5 h-5 fill-current" />
           </div>
           <div>
-            <div className="font-bold text-white tracking-wide text-lg leading-none">Blazly</div>
+            <div className="font-bold text-white tracking-wide text-lg leading-none">Eholler</div>
             <div className="text-[10px] tracking-widest uppercase text-orange-400 font-semibold mt-1">Local SEO</div>
           </div>
         </div>
@@ -83,6 +90,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
         </nav>
+
+        {/* Quick Action: Start New Business Audit */}
+        <div className="px-4 pb-2">
+          <button
+            onClick={() => {
+              if (onNewAudit) onNewAudit();
+              else onOpenAuditModal();
+            }}
+            className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-lg text-xs font-semibold bg-[#1A2632] hover:bg-[#223140] text-orange-400 border border-[#263748] transition shadow-sm"
+          >
+            <PlusCircle className="w-3.5 h-3.5" />
+            <span>New Business Audit</span>
+          </button>
+        </div>
       </div>
 
       {/* Bottom Nav */}

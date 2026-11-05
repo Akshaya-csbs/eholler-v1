@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import axios from 'axios';
 import { COOKIE, GOOGLE_TOKEN_URL, isGoogleOAuthConfigured, tokenCookieOptions } from './gsc-config';
+import { getDefaultOrgScope } from './db/default-org';
 
 const ACCESS_COOKIE_MAX_AGE = 60 * 60;
 const REFRESH_COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
@@ -102,6 +103,17 @@ export function isGscConnected(): boolean {
   return Boolean(store.get(COOKIE.access)?.value || store.get(COOKIE.refresh)?.value);
 }
 
+export async function isGscConnectedWithDb(): Promise<boolean> {
+  if (isGscConnected()) return true;
+  try {
+    const orgScope = await getDefaultOrgScope();
+    const conn = await orgScope.getGoogleConnection();
+    return Boolean(conn && (conn.accessToken || conn.refreshToken));
+  } catch {
+    return false;
+  }
+}
+
 async function refreshAccessToken(refreshToken: string): Promise<{
   access_token: string;
   expires_in?: number;
@@ -141,24 +153,87 @@ async function refreshAccessToken(refreshToken: string): Promise<{
 
 export async function getValidAccessToken(): Promise<string | null> {
   const stored = readStoredTokens();
-  if (!stored) return null;
 
-  const stillValid = stored.expiryMs - Date.now() > 60_000;
-  if (stillValid) return stored.accessToken;
+  // 1. Try memory/cookie tokens first
+  if (stored) {
+    const stillValid = stored.expiryMs - Date.now() > 60_000;
+    if (stillValid) return stored.accessToken;
 
-  if (!stored.refreshToken) {
+    if (stored.refreshToken) {
+      const refreshed = await refreshAccessToken(stored.refreshToken);
+      if (refreshed) {
+        applyTokenCookies({
+          access_token: refreshed.access_token,
+          expires_in: refreshed.expires_in,
+          refresh_token: refreshed.refresh_token || stored.refreshToken,
+        });
+
+        // Sync refreshed tokens to PostgreSQL
+        try {
+          const orgScope = await getDefaultOrgScope();
+          const expiresInSec = Number(refreshed.expires_in) || 3600;
+          await orgScope.saveGoogleConnection({
+            email: 'default-connection@gsc.local',
+            accessToken: refreshed.access_token,
+            refreshToken: refreshed.refresh_token || stored.refreshToken,
+            tokenExpiry: new Date(Date.now() + expiresInSec * 1000),
+            scopes: ['https://www.googleapis.com/auth/webmasters.readonly'],
+          });
+        } catch (dbErr) {
+          console.warn('Could not sync refreshed token to DB:', dbErr);
+        }
+
+        return refreshed.access_token;
+      }
+    }
+
     return stored.accessToken || null;
   }
 
-  const refreshed = await refreshAccessToken(stored.refreshToken);
-  if (!refreshed) return null;
+  // 2. Fallback to PostgreSQL encrypted GoogleConnection
+  try {
+    const orgScope = await getDefaultOrgScope();
+    const conn = await orgScope.getGoogleConnection();
+    if (!conn) return null;
 
-  applyTokenCookies({
-    access_token: refreshed.access_token,
-    expires_in: refreshed.expires_in,
-    refresh_token: refreshed.refresh_token || stored.refreshToken,
-  });
+    const isStillValid = conn.tokenExpiry ? conn.tokenExpiry.getTime() - Date.now() > 60_000 : false;
+    if (isStillValid && conn.accessToken) {
+      const remainingSeconds = conn.tokenExpiry
+        ? Math.max(60, Math.floor((conn.tokenExpiry.getTime() - Date.now()) / 1000))
+        : 3600;
+      applyTokenCookies({
+        access_token: conn.accessToken,
+        expires_in: remainingSeconds,
+        refresh_token: conn.refreshToken || undefined,
+      });
+      return conn.accessToken;
+    }
 
+    // Attempt refresh if refresh token is in DB
+    if (conn.refreshToken) {
+      const refreshed = await refreshAccessToken(conn.refreshToken);
+      if (refreshed) {
+        const expiresInSec = Number(refreshed.expires_in) || 3600;
+        await orgScope.saveGoogleConnection({
+          email: conn.email || 'default-connection@gsc.local',
+          accessToken: refreshed.access_token,
+          refreshToken: refreshed.refresh_token || conn.refreshToken,
+          tokenExpiry: new Date(Date.now() + expiresInSec * 1000),
+          scopes: conn.scopes || ['https://www.googleapis.com/auth/webmasters.readonly'],
+        });
 
-  return refreshed.access_token;
+        applyTokenCookies({
+          access_token: refreshed.access_token,
+          expires_in: refreshed.expires_in,
+          refresh_token: refreshed.refresh_token || conn.refreshToken,
+        });
+
+        return refreshed.access_token;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to resolve Google connection from database fallback:', err);
+  }
+
+  return null;
 }

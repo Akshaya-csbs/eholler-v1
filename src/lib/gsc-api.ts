@@ -52,6 +52,56 @@ export async function listSearchConsoleProperties(accessToken: string): Promise<
     .filter((entry: GscProperty) => entry.siteUrl);
 }
 
+/**
+ * Normalizes a URL, domain, or Search Console siteUrl string into a canonical domain hostname
+ * for robust matching across domain properties (sc-domain:example.com) and URL prefix properties (https://example.com/).
+ */
+export function normalizeDomainForMatch(rawUrl: string): string {
+  if (!rawUrl) return '';
+  let cleaned = rawUrl.trim().toLowerCase();
+  if (cleaned.startsWith('sc-domain:')) {
+    cleaned = cleaned.replace(/^sc-domain:/, '');
+  }
+  cleaned = cleaned.replace(/^https?:\/\//, '');
+  cleaned = cleaned.replace(/^www\./, '');
+  cleaned = cleaned.split('/')[0];
+  cleaned = cleaned.split(':')[0]; // remove port
+  return cleaned;
+}
+
+/**
+ * Finds the best Search Console property match for a given target website URL.
+ * Matches domain properties (sc-domain:domain.com), exact URL prefixes, and subdomains.
+ */
+export function findMatchingProperty(
+  properties: GscProperty[],
+  targetWebsiteUrl?: string
+): GscProperty | null {
+  if (!targetWebsiteUrl || !properties.length) return null;
+  const targetDomain = normalizeDomainForMatch(targetWebsiteUrl);
+  if (!targetDomain) return null;
+
+  // 1. Exact sc-domain match (e.g. sc-domain:example.com)
+  const scDomainMatch = properties.find(
+    (p) => p.siteUrl.toLowerCase() === `sc-domain:${targetDomain}`
+  );
+  if (scDomainMatch) return scDomainMatch;
+
+  // 2. URL-prefix exact domain match (https://example.com/ or https://www.example.com/)
+  const urlPrefixMatch = properties.find((p) => {
+    const propDomain = normalizeDomainForMatch(p.siteUrl);
+    return propDomain === targetDomain;
+  });
+  if (urlPrefixMatch) return urlPrefixMatch;
+
+  // 3. Subdomain or parent domain match
+  const looseMatch = properties.find((p) => {
+    const propDomain = normalizeDomainForMatch(p.siteUrl);
+    return propDomain.endsWith(targetDomain) || targetDomain.endsWith(propDomain);
+  });
+  return looseMatch || null;
+}
+
 function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }

@@ -66,7 +66,7 @@ export const ToolsSection: React.FC<ToolsSectionProps> = ({
                 See if your category and location is low, medium, or high competition on Google Maps.
               </div>
               <div className="text-[11px] font-medium text-gray-700 mt-1">
-                {business.category} · {business.city} · {competitors.length + 15} competitors
+                {business.category} · {business.city} · {competitors.length} real competitors analyzed
               </div>
             </div>
           </div>
@@ -94,8 +94,8 @@ export const ToolsSection: React.FC<ToolsSectionProps> = ({
           </div>
           <div className="flex items-center gap-1.5">
             <div className="text-right">
-              <span className="text-sm font-bold text-gray-900">12</span>
-              <span className="text-[11px] text-gray-400 block -mt-1">Live Listings</span>
+              <span className="text-xs font-semibold text-gray-500">Coming Soon</span>
+              <span className="text-[11px] text-gray-400 block -mt-0.5">Citation Sync</span>
             </div>
             <ChevronRight className="w-4 h-4 text-gray-400" />
           </div>
@@ -138,7 +138,7 @@ export const ToolsSection: React.FC<ToolsSectionProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <div className="text-right">
-              <span className="text-xs font-bold text-gray-700">vs {competitors[0]?.name?.slice(0, 16) || 'Das Manpower'}</span>
+              <span className="text-xs font-bold text-gray-700">vs {competitors[0]?.name?.slice(0, 16) || 'Local Benchmark'}</span>
               <span className="text-[10px] text-gray-400 block -mt-0.5">Competitor Benchmark</span>
             </div>
             <ChevronRight className="w-4 h-4 text-gray-400" />

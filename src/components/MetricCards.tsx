@@ -58,9 +58,11 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ data, onOpenGscModal }
         </div>
 
         <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-50">
-          <span className="text-gray-500">Maps rank</span>
-          <span className="inline-flex items-center text-emerald-600 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded text-[11px]">
-            <ArrowUpRight className="w-3 h-3 mr-0.5" /> #{scores.mapsRank}
+          <span className="text-gray-500">Local benchmark</span>
+          <span className="inline-flex items-center text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded text-[11px]">
+            {data.competitors && data.competitors.length > 0
+              ? `Pack Rank #${scores.mapsRank} of ${data.competitors.length + 1}`
+              : 'Profile Evaluated'}
           </span>
         </div>
       </div>
@@ -180,14 +182,13 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ data, onOpenGscModal }
 
         <div className="my-3 flex items-baseline gap-2">
           <span className="text-2xl font-bold text-gray-900">{searchConsole.mapsVisibilityPercent}%</span>
-          <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-            +100%
-          </span>
         </div>
 
         <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-50 text-gray-500">
-          <span>Top 10 keywords</span>
-          <span className="font-semibold text-gray-900">{searchConsole.top10KeywordsCount}</span>
+          <span>Top 10 queries</span>
+          <span className="font-semibold text-gray-900">
+            {searchConsole.connected ? searchConsole.top10KeywordsCount : 'Requires GSC'}
+          </span>
         </div>
       </div>
 
@@ -203,8 +204,10 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ data, onOpenGscModal }
 
         <div className="my-3 flex items-baseline gap-2">
           <span className="text-2xl font-bold text-gray-900">{scores.gbpHealth}</span>
-          <span className="text-xs font-semibold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
-            {scores.gbpHealthChange > 0 ? `+${scores.gbpHealthChange}` : scores.gbpHealthChange}
+          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+            {scores.gbpHealthChange !== 0
+              ? (scores.gbpHealthChange > 0 ? `+${scores.gbpHealthChange}` : scores.gbpHealthChange)
+              : 'Verified'}
           </span>
         </div>
 

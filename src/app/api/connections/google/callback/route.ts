@@ -9,6 +9,7 @@ import {
   tokenCookieOptions,
 } from '@/lib/gsc-config';
 import { applyTokenCookies, clearGscCookies } from '@/lib/gsc-tokens';
+import { getDefaultOrgScope } from '@/lib/db/default-org';
 import { cookies } from 'next/headers';
 
 function safeEqual(left?: string | null, right?: string | null): boolean {
@@ -79,6 +80,22 @@ export async function GET(req: NextRequest) {
       },
       success
     );
+
+    // Persist securely into Neon with AES-256-GCM encrypted tokens
+    try {
+      const orgScope = await getDefaultOrgScope();
+      const expiresInSec = Number(tokenRes.data.expires_in) || 3600;
+      await orgScope.saveGoogleConnection({
+        email: 'default-connection@gsc.local',
+        accessToken: tokenRes.data.access_token,
+        refreshToken: tokenRes.data.refresh_token,
+        tokenExpiry: new Date(Date.now() + expiresInSec * 1000),
+        scopes: ['https://www.googleapis.com/auth/webmasters.readonly'],
+      });
+    } catch (dbErr) {
+      console.warn('Could not persist encrypted Google connection to database (non-fatal):', dbErr);
+    }
+
     success.cookies.set(COOKIE.state, '', tokenCookieOptions(0));
     return success;
   } catch {

@@ -25,6 +25,7 @@ interface ConnectGscModalProps {
   }) => void;
   isConnected: boolean;
   selectedProperty: string | null;
+  businessWebsiteUrl?: string;
 }
 
 const ERROR_COPY: Record<string, string> = {
@@ -53,6 +54,7 @@ export const ConnectGscModal: React.FC<ConnectGscModalProps> = ({
   onConnectedChange,
   isConnected,
   selectedProperty,
+  businessWebsiteUrl,
 }) => {
   const [oauthConfigured, setOauthConfigured] = useState(true);
   const [redirectUri, setRedirectUri] = useState('http://localhost:3000/api/connections/google/callback');
@@ -61,9 +63,11 @@ export const ConnectGscModal: React.FC<ConnectGscModalProps> = ({
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [properties, setProperties] = useState<GscProperty[]>([]);
+  const [recommendedProperty, setRecommendedProperty] = useState<string | null>(null);
   const [pendingProperty, setPendingProperty] = useState<string>('');
   const [analytics, setAnalytics] = useState<GscAnalyticsResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSessionExpired, setIsSessionExpired] = useState<boolean>(false);
 
   const loadAnalytics = async (siteUrl: string) => {
     setLoadingAnalytics(true);
@@ -80,6 +84,9 @@ export const ConnectGscModal: React.FC<ConnectGscModalProps> = ({
       });
     } catch (err: any) {
       setAnalytics(null);
+      if (err.response?.status === 401) {
+        setIsSessionExpired(true);
+      }
       setError(err.response?.data?.error || 'Could not load Search Console performance data.');
     } finally {
       setLoadingAnalytics(false);
@@ -89,19 +96,33 @@ export const ConnectGscModal: React.FC<ConnectGscModalProps> = ({
   const loadProperties = async (currentProperty: string | null) => {
     setLoadingProperties(true);
     setError(null);
+    setIsSessionExpired(false);
     try {
-      const response = await axios.get<{ properties: GscProperty[] }>('/api/connections/google/properties');
+      const url = businessWebsiteUrl
+        ? `/api/connections/google/properties?websiteUrl=${encodeURIComponent(businessWebsiteUrl)}`
+        : '/api/connections/google/properties';
+      const response = await axios.get<{ properties: GscProperty[]; recommendedProperty?: string | null }>(url);
       const list = response.data.properties || [];
+      const recommended = response.data.recommendedProperty || null;
       setProperties(list);
+      setRecommendedProperty(recommended);
+
+      // Choose initial: currentProperty -> recommended -> first in list
       const initial = currentProperty && list.some((item) => item.siteUrl === currentProperty)
         ? currentProperty
+        : recommended && list.some((item) => item.siteUrl === recommended)
+        ? recommended
         : list[0]?.siteUrl || '';
+
       setPendingProperty(initial);
       if (!list.length) {
         onConnectedChange({ connected: true, selectedProperty: null, analytics: null });
       }
     } catch (err: any) {
       setProperties([]);
+      if (err.response?.status === 401) {
+        setIsSessionExpired(true);
+      }
       setError(err.response?.data?.error || 'Could not load Search Console properties.');
     } finally {
       setLoadingProperties(false);
@@ -267,29 +288,72 @@ export const ConnectGscModal: React.FC<ConnectGscModalProps> = ({
                 </button>
               </div>
 
-              {loadingProperties ? (
+              {isSessionExpired ? (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl space-y-2.5">
+                  <div className="font-semibold text-red-800 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                    <span>Session Expired or Revoked</span>
+                  </div>
+                  <p className="text-red-700 text-xs leading-relaxed">
+                    Google authorization has expired or was revoked. Reconnect your Google account to restore Search Console access.
+                  </p>
+                  <button
+                    onClick={handleConnect}
+                    className="w-full py-2 bg-[#176B72] hover:bg-[#125359] text-white font-semibold text-xs rounded-lg transition shadow-sm flex items-center justify-center gap-2"
+                  >
+                    <span>Reconnect Google Search Console</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : loadingProperties ? (
                 <div className="py-6 text-center text-gray-500">
                   <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-blue-600" />
                   Loading Search Console properties…
                 </div>
               ) : properties.length === 0 ? (
-                <div className="p-4 rounded-xl border border-dashed border-gray-300 text-gray-500 text-center">
-                  No Search Console properties were found for this Google account. Add and verify the business website in Google Search Console, then reconnect.
+                <div className="p-4 rounded-xl border border-dashed border-amber-300 bg-amber-50/50 text-gray-700 space-y-3">
+                  <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>No Verified Properties Found</span>
+                  </div>
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    No Search Console properties were found on this Google account. To view live organic analytics, add and verify your business website in Google Search Console first.
+                  </p>
+                  <a
+                    href="https://search.google.com/search-console"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-xs font-semibold text-amber-900 hover:bg-amber-100 transition shadow-sm"
+                  >
+                    <span>Open Google Search Console</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </a>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <label className="block font-bold text-gray-800">Select the property for this business website</label>
-                  <select
-                    value={pendingProperty}
-                    onChange={(e) => setPendingProperty(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs bg-white"
-                  >
-                    {properties.map((property) => (
-                      <option key={property.siteUrl} value={property.siteUrl}>
-                        {property.siteUrl} ({property.permissionLevel})
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block font-bold text-gray-800 mb-1">
+                      Select the property for this business website
+                    </label>
+                    {recommendedProperty && (
+                      <div className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg mb-2 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Recommended match: <strong className="font-mono">{recommendedProperty}</strong> matches {businessWebsiteUrl || 'your website'}</span>
+                      </div>
+                    )}
+                    <select
+                      value={pendingProperty}
+                      onChange={(e) => setPendingProperty(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 text-xs bg-white"
+                    >
+                      {properties.map((property) => (
+                        <option key={property.siteUrl} value={property.siteUrl}>
+                          {property.siteUrl === recommendedProperty ? '★ [Recommended] ' : ''}
+                          {property.siteUrl} ({property.permissionLevel})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <button
                     onClick={handleSelectProperty}
                     disabled={!pendingProperty || loadingAnalytics}
