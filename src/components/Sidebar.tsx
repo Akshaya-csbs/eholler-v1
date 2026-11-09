@@ -1,4 +1,7 @@
+'use client';
+
 import React from 'react';
+import { useClerk, useUser } from '@clerk/nextjs';
 import {
   LayoutDashboard,
   FileCheck2,
@@ -36,6 +39,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNewAudit,
   gscConnected = false,
 }) => {
+  const { signOut } = useClerk();
+  const { user } = useUser();
+
   const mainNav = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, locked: false },
     { id: 'profile-opt', label: 'GBP Profile Audit', icon: FileCheck2, locked: false },
@@ -108,15 +114,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Bottom Nav */}
       <div className="p-4 border-t border-[#1E2B37] space-y-1">
+        {user && (
+          <div className="px-3.5 py-2 mb-1 rounded-lg bg-[#16202A] border border-[#223140] flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-full bg-[#C84A22] text-white flex items-center justify-center font-bold text-xs shrink-0 uppercase">
+              {user.firstName?.[0] || user.primaryEmailAddress?.emailAddress?.[0] || 'U'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium text-white truncate">
+                {user.fullName || user.primaryEmailAddress?.emailAddress?.split('@')[0]}
+              </div>
+              <div className="text-[10px] text-gray-400 truncate">
+                {user.primaryEmailAddress?.emailAddress}
+              </div>
+            </div>
+          </div>
+        )}
         <button className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-[#1A2632] transition">
           <Settings className="w-4 h-4" />
           <span>Business Settings</span>
         </button>
-        <button className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-[#1A2632] transition">
-          <User className="w-4 h-4" />
-          <span>Profile</span>
-        </button>
-        <button className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-[#1A2632] transition">
+        <button
+          onClick={() => signOut({ redirectUrl: '/sign-in' })}
+          className="w-full flex items-center gap-3 px-3.5 py-2 rounded-lg text-sm text-gray-400 hover:text-red-400 hover:bg-[#1A2632] transition"
+        >
           <LogOut className="w-4 h-4" />
           <span>Sign out</span>
         </button>

@@ -14,6 +14,7 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@clerk/nextjs": "^5.7.6",
     "@prisma/client": "^6.19.3",
     "axios": "^1.7.7",
     "cheerio": "^1.0.0",

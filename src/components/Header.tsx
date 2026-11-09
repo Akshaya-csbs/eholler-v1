@@ -1,5 +1,6 @@
 import React from 'react';
 import { ExternalLink, RefreshCw, AlertTriangle, Layers, PlusCircle } from 'lucide-react';
+import { UserButton } from '@clerk/nextjs';
 import { AuditResponse } from '@/lib/types';
 
 interface HeaderProps {
@@ -39,6 +40,9 @@ export const Header: React.FC<HeaderProps> = ({
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             <span>{isLoading ? 'Analyzing...' : 'Run Analysis'}</span>
           </button>
+          <div className="pl-2 border-l border-gray-200">
+            <UserButton afterSignOutUrl="/sign-in" />
+          </div>
         </div>
       </div>
     );
@@ -123,6 +127,9 @@ export const Header: React.FC<HeaderProps> = ({
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           <span>{isLoading ? 'Re-evaluating...' : 'Re-run Analysis'}</span>
         </button>
+        <div className="pl-2 border-l border-gray-200">
+          <UserButton afterSignOutUrl="/sign-in" />
+        </div>
       </div>
     </div>
   );
