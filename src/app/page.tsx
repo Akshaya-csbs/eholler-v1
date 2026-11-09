@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { useAuthSync } from '@/hooks/useAuthSync';
 import { Sidebar } from '@/components/Sidebar';
 import { Header } from '@/components/Header';
 import { MetricCards } from '@/components/MetricCards';
@@ -42,6 +43,10 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+
+  // Sync the authenticated Clerk user to the Neon PostgreSQL database once on load.
+  // Runs exactly once per session; does not block the dashboard from rendering.
+  const { syncStatus, syncError, retrySync } = useAuthSync();
 
   // Modals state
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
@@ -314,6 +319,24 @@ export default function DashboardPage() {
 
         {/* Content View */}
         <main className="p-8 max-w-7xl w-full mx-auto space-y-6">
+          {/* Auth sync error banner — shown only on failure, with retry action */}
+          {syncStatus === 'error' && (
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span className="font-medium">
+                  Session sync failed: {syncError || 'Unknown error'}. Your work is safe — please retry.
+                </span>
+              </div>
+              <button
+                onClick={retrySync}
+                className="underline font-semibold hover:text-amber-900 ml-4 shrink-0 text-xs"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center justify-between shadow-sm">
               <div className="flex items-center gap-2.5">
